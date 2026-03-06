@@ -1,6 +1,6 @@
 # NPG Lite Wheelchair-Simulator Firmware
 
-A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside Down Labs. This project lets you control a computer (or game) using your **eye movements** and **jaw clenches**—no hands needed!
+A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside Down Labs. This project lets you control a computer (or game) using your **eye movements** and **jaw clenches**!
 
 ---
 
