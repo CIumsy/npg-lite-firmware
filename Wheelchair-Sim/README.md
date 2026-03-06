@@ -112,4 +112,3 @@ You can tune these in the code to fit your needs:
 
 ---
 
-**Open Source | GPLv3 | (c) 2025 Upside Down Labs**
