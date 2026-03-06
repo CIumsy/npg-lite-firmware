@@ -39,6 +39,8 @@ Adafruit_NeoPixel pixels(PIXEL_COUNT, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 #define DEBUG_LEVEL 0 // 0 = off, 1 = jaw debug, 2 = eye debug
 
+#define NOTCH_FILTER_FREQ 50 // Set to 50 or 60 according to your powerline noise
+
 
 // Key mapping (change if needed)
 #define EOG_LEFT_KEY 'a'  // Left eye
@@ -105,8 +107,6 @@ public:
     z2_0 = 0.0;
   }
 };
-
-#define NOTCH_FILTER_FREQ 50 // Set to 50 or 60 according to your powerline noise
 
 // Band-Stop Butterworth IIR digital filter
 // Sampling rate: 500.0 Hz, frequency: [48.0, 52.0] Hz

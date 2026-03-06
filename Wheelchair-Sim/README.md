@@ -82,6 +82,23 @@ You can tune these in the code to fit your needs:
 
 ---
 
+## Notch Filter
+
+To reduce interference from powerline noise, set the notch filter frequency in the code:
+
+- **50 Hz:** For regions with 50 Hz powerline (most of Europe, Asia, Africa)
+- **60 Hz:** For regions with 60 Hz powerline (most of North America)
+
+Edit the following line at the top of `Wheelchair-Sim.ino`:
+
+```cpp
+#define NOTCH_FILTER_FREQ 50 // Set to 50 or 60 according to your region's powerline noise
+```
+
+Choose the value that matches your local powerline frequency, then re-upload the firmware.
+
+---
+
 ## How It Works (Signal Pipeline)
 1. **Raw ADC** (A0) sampled at 500 Hz
 2. **Notch Filter** removes powerline noise (48–52 Hz)
