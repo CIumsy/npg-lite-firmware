@@ -106,44 +106,65 @@ public:
   }
 };
 
+#define NOTCH_FILTER_FREQ 50 // Set to 50 or 60 according to your powerline noise
+
 // Band-Stop Butterworth IIR digital filter
 // Sampling rate: 500.0 Hz, frequency: [48.0, 52.0] Hz
 // Filter is order 2, implemented as second-order sections (biquads)
 // Reference: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
-class NotchFilter
-{
+class Notch50 {
 private:
   float z1_0 = 0.0;
   float z2_0 = 0.0;
   float z1_1 = 0.0;
   float z2_1 = 0.0;
-
 public:
-  float process(float input_sample)
-  {
+  float process(float input_sample) {
     float output = input_sample;
-
     // Biquad section 0
     float x = output - (-1.56858163 * z1_0) - (0.96424138 * z2_0);
     output = 0.96508099 * x + -1.56202714 * z1_0 + 0.96508099 * z2_0;
     z2_0 = z1_0;
     z1_0 = x;
-
     // Biquad section 1
     x = output - (-1.61100358 * z1_1) - (0.96592171 * z2_1);
     output = 1.00000000 * x + -1.61854514 * z1_1 + 1.00000000 * z2_1;
     z2_1 = z1_1;
     z1_1 = x;
-
     return output;
   }
+  void reset() {
+    z1_0 = z2_0 = z1_1 = z2_1 = 0.0;
+  }
+};
 
-  void reset()
-  {
-    z1_0 = 0.0;
-    z2_0 = 0.0;
-    z1_1 = 0.0;
-    z2_1 = 0.0;
+// Band-Stop Butterworth IIR digital filter
+// Sampling rate: 500.0 Hz, frequency: [58.0, 62.0] Hz
+// Filter is order 2, implemented as second-order sections (biquads)
+// Reference: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
+class Notch60 {
+private:
+  struct BiquadState { float z1 = 0, z2 = 0; };
+  BiquadState state0;
+  BiquadState state1;
+public:
+  float process(float input) {
+    float output = input;
+    // Biquad section 0
+    float x0 = output - (-1.40810535f * state0.z1) - (0.96443153f * state0.z2);
+    output = 0.96508099f * x0 + -1.40747202f * state0.z1 + 0.96508099f * state0.z2;
+    state0.z2 = state0.z1;
+    state0.z1 = x0;
+    // Biquad section 1
+    float x1 = output - (-1.45687509f * state1.z1) - (0.96573127f * state1.z2);
+    output = 1.00000000f * x1 + -1.45839783f * state1.z1 + 1.00000000f * state1.z2;
+    state1.z2 = state1.z1;
+    state1.z1 = x1;
+    return output;
+  }
+  void reset() {
+    state0.z1 = state0.z2 = 0;
+    state1.z1 = state1.z2 = 0;
   }
 };
 
@@ -245,7 +266,13 @@ public:
 
 
 // Filter and detector objects
-NotchFilter notchFilterShared;
+#if NOTCH_FILTER_FREQ == 50
+Notch50 notchFilterShared;
+#elif NOTCH_FILTER_FREQ == 60
+Notch60 notchFilterShared;
+#else
+#error "NOTCH_FILTER_FREQ must be 50 or 60"
+#endif
 EOGFilter eogHP_eye;
 LowPassFilter eogLP_eye;
 EMG emgHP10_jaw;
