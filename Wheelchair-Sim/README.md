@@ -44,6 +44,7 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 ---
 
 ## Controls & Key Mapping
+
 | Action                | Key Sent |
 |-----------------------|----------|
 | Look Left (EOG)       | `a`      |
