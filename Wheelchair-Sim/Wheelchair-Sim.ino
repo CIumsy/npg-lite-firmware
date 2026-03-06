@@ -19,18 +19,6 @@
 // Our mission is to make neuroscience affordable and accessible for everyone.
 // By supporting us with your purchase, you help spread innovation and open science.
 // Thank you for being part of this journey with us!
-/*
-  FFT routines based on Espressif’s ESP-DSP examples:
-
-    • Initialization (dsps_fft2r_init_fc32) from:
-      https://github.com/espressif/esp-dsp/tree/master/examples/basic_math
-      (examples/basic_math/main/dsps_math_main.c)
-
-    • Two-real FFT processing
-      (dsps_fft2r_fc32, dsps_bit_rev_fc32, dsps_cplx2reC_fc32)
-      from: https://github.com/espressif/esp-dsp/tree/master/examples/fft
-      (examples/fft/main/dsps_fft_main.c)
-*/
 
 #include <Arduino.h>
 #include <vector>
