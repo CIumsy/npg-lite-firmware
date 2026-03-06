@@ -15,7 +15,11 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 ## Hardware Requirements
 - **NPG Lite(Any pack)**
 - **USB-C cable** 
-- **3 Gel Electrodes** 
+- **3 Gel Electrodes**
+- **3 BioAmp Snap Cables**
+- **Nuprep Skin Preparation Gel**
+- **Alcohol Swabs**
+- **A Windows Laptop/Desktop**
 
 ---
 
@@ -29,8 +33,6 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 ---
 
 ## Electrode Placement
-Add the following image to your project folder:
-- `electrode-placement.png`
 
 ![Electrode Placement](electrode-placement.png)
 
