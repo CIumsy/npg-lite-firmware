@@ -20,7 +20,7 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 ---
 
 ## 🖥️ Software Requirements
-- Arduino IDE (with ESP32 board support)
+- Arduino IDE (with ESP32 3.2.0 board version installed)
 - Required libraries:
   - `BleCombo` (for BLE HID keyboard)
   - `Adafruit_NeoPixel` (for LEDs)
