@@ -321,20 +321,28 @@ void detectEyeMovement(unsigned long nowMs, float absDeviation)
   if (!bleKeyboard.isConnected())
     return;
 
+  static unsigned long keyReleaseTime = 0;
+  static char keyToRelease = 0;
+
+  if (keyToRelease != 0 && nowMs >= keyReleaseTime) {
+    bleKeyboard.release(keyToRelease);
+    keyToRelease = 0;
+  }
+
   if (deviation > EYE_MOVEMENT_THRESHOLD) // Left eye movement
   {
     Serial.println("LEFT");
     bleKeyboard.press(EOG_LEFT_KEY);
-    delay(EYE_KEY_HOLD_MS);
-    bleKeyboard.release(EOG_LEFT_KEY);
+    keyToRelease = EOG_LEFT_KEY;
+    keyReleaseTime = nowMs + EYE_KEY_HOLD_MS;
     lastMovementDetectedTime = nowMs;
   }
   else if (deviation < -EYE_MOVEMENT_THRESHOLD) // Right eye movement
   {
     Serial.println("RIGHT");
     bleKeyboard.press(EOG_RIGHT_KEY);
-    delay(EYE_KEY_HOLD_MS);
-    bleKeyboard.release(EOG_RIGHT_KEY);
+    keyToRelease = EOG_RIGHT_KEY;
+    keyReleaseTime = nowMs + EYE_KEY_HOLD_MS;
     lastMovementDetectedTime = nowMs;
   }
 }
@@ -380,13 +388,21 @@ void detectJaw(unsigned long nowMs)
   }
 
   // While jaw is clenched, send key every 200ms
+  static unsigned long jawKeyReleaseTime = 0;
+  static char jawKeyToRelease = 0;
+
+  if (jawKeyToRelease != 0 && nowMs >= jawKeyReleaseTime) {
+    bleKeyboard.release(jawKeyToRelease);
+    jawKeyToRelease = 0;
+  }
+
   if (high && currentJawHoldKey != 0 && bleKeyboard.isConnected())
   {
     if (nowMs - lastJawHoldSendTime >= JAW_HOLD_REPEAT_MS)
     {
       bleKeyboard.press(currentJawHoldKey);
-      delay(10);
-      bleKeyboard.release(currentJawHoldKey);
+      jawKeyToRelease = currentJawHoldKey;
+      jawKeyReleaseTime = nowMs + 10; // 10ms hold
       lastJawHoldSendTime = nowMs;
     }
   }
