@@ -333,7 +333,7 @@ void detectEyeMovement(unsigned long nowMs, float absDeviation)
   if (!bleKeyboard.isConnected())
     return;
 
-  if (deviation < -EYE_MOVEMENT_THRESHOLD)
+  if (deviation > EYE_MOVEMENT_THRESHOLD) // Left eye movement
   {
     Serial.println("LEFT");
     bleKeyboard.press(EOG_LEFT_KEY);
@@ -341,7 +341,7 @@ void detectEyeMovement(unsigned long nowMs, float absDeviation)
     bleKeyboard.release(EOG_LEFT_KEY);
     lastMovementDetectedTime = nowMs;
   }
-  else if (deviation > EYE_MOVEMENT_THRESHOLD)
+  else if (deviation < -EYE_MOVEMENT_THRESHOLD) // Right eye movement
   {
     Serial.println("RIGHT");
     bleKeyboard.press(EOG_RIGHT_KEY);

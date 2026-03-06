@@ -36,7 +36,6 @@ Add the following image to your project folder:
 
 **Typical placement:**
 - **Eye (EOG):** 2 electrodes near the outer corners of the eyes (horizontal)
-- **Jaw (EMG):** 1 electrode on the jaw muscle (masseter)
 - **Reference:** On the earlobe or forehead
 
 ---
