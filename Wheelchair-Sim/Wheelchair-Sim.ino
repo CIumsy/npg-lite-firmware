@@ -316,11 +316,14 @@ void detectEyeMovement(unsigned long nowMs, float absDeviation)
 
   debugPrintEye(nowMs, absDeviation);
 
-  if ((nowMs - lastMovementDetectedTime) < MOVEMENT_DEBOUNCE_MS)
-    return;
-  if (!bleKeyboard.isConnected())
-    return;
+void detectEyeMovement(unsigned long nowMs, float absDeviation)
+{
+  float baseline = horizontalBaseline.get_baseline();
+  float deviation = horizontalSignal - baseline;
 
+  debugPrintEye(nowMs, absDeviation);
+
+  // Handle pending key release first (must run every call)
   static unsigned long keyReleaseTime = 0;
   static char keyToRelease = 0;
 
@@ -328,6 +331,17 @@ void detectEyeMovement(unsigned long nowMs, float absDeviation)
     bleKeyboard.release(keyToRelease);
     keyToRelease = 0;
   }
+
+  if ((nowMs - lastMovementDetectedTime) < MOVEMENT_DEBOUNCE_MS)
+    return;
+  if (!bleKeyboard.isConnected())
+    return;
+
+  if (deviation > EYE_MOVEMENT_THRESHOLD) // Left eye movement
+  {
+    // ... rest of detection logic
+  }
+}
 
   if (deviation > EYE_MOVEMENT_THRESHOLD) // Left eye movement
   {
