@@ -35,24 +35,21 @@ Add the following image to your project folder:
 ![Electrode Placement](electrode-placement.png)
 
 **Typical placement:**
-- **Eye (EOG):** 2 electrodes near the outer corners of the eyes (horizontal)
-- **Reference:** On the earlobe or forehead
+- **Positive** Near the outer corner of the left eye
+- **Negative** Near the outer corner of the right eye
+- **Reference:** Bony part behind the earlobe
 
 ---
 
 ## 🎮 Controls & Key Mapping
-| Action                | Key Sent | How to Trigger                |
-|-----------------------|----------|-------------------------------|
-| Look Left (EOG)       | `a`      | Move eyes left (hold 200ms)   |
-| Look Right (EOG)      | `d`      | Move eyes right (hold 200ms)  |
-| Jaw Clench (single)   | `w`      | Clench jaw (hold, repeat)     |
-| Jaw Clench (double)   | `s`      | Double clench (within 500ms)  |
+| Action                | Key Sent |
+|-----------------------|----------|
+| Look Left (EOG)       | `a`      |
+| Look Right (EOG)      | `d`      |
+| Jaw Clench (single)   | `w`      |
+| Jaw Clench (double)   | `s`      |
 
 - **All keys are configurable** at the top of the code (`#define EOG_LEFT_KEY`, etc.)
-- **NeoPixel LED 0:**
-  - Green = BLE connected
-  - Red = BLE disconnected
-
 ---
 
 ## 🧪 Debug Mode
@@ -60,7 +57,7 @@ Add the following image to your project folder:
   - `0` = Off (default)
   - `1` = Jaw debug (prints jaw envelope)
   - `2` = Eye debug (prints eye deviation)
-- Debug output appears on Serial Monitor (115200 baud)
+- Debug output appears on Serial Monitor (115200 baud rate)
 
 ---
 
@@ -99,8 +96,8 @@ You can tune these in the code to fit your needs:
 ---
 
 ## 🚀 Getting Started
-1. Connect electrodes as shown in the image
-2. Flash the firmware to your NPG Lite board
+1. Connect electrodes and BioAmp snap cables as shown in the image
+2. Flash the firmware to your NPG Lite board using a USB-C cable
 3. Pair with your computer/phone via Bluetooth (shows as "NPG Lite GAMING")
 4. Open a text editor or game and try the controls!
 
@@ -108,7 +105,7 @@ You can tune these in the code to fit your needs:
 
 ## 📚 More Info
 - [Upside Down Labs](https://upsidedownlabs.tech)
-- [NPG Lite Documentation](https://github.com/upsidedownlabs/npg-lite)
+- [NPG Lite Documentation](https://docs.upsidedownlabs.tech/hardware/bioamp/neuro-play-ground-lite/index.html)
 - [Contact Support](mailto:contact@upsidedownlabs.tech)
 
 ---
