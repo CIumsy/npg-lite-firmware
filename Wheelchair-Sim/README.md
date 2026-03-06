@@ -4,7 +4,7 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 
 ---
 
-## 🧠 What Does It Do?
+## What Does It Do?
 - Reads bio-potential signals from your face (eyes and jaw) using a single analog input (A0) on Neuro Playground Lite
 - Detects **left/right eye movement** and **jaw clench** (single/double)
 - Sends keypresses (a/d/w/s) over Bluetooth as a BLE keyboard
@@ -12,14 +12,14 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 
 ---
 
-## 🛠️ Hardware Requirements
+## Hardware Requirements
 - **NPG Lite(Any pack)**
 - **USB-C cable** 
 - **3 Gel Electrodes** 
 
 ---
 
-## 🖥️ Software Requirements
+## Software Requirements
 - Arduino IDE (with ESP32 3.2.0 board version installed)
 - Required libraries:
   - `BleCombo` (for BLE HID keyboard)
@@ -28,7 +28,7 @@ A simple open-source firmware for **Neuro PlayGround Lite (NPG Lite)** by Upside
 
 ---
 
-## 🎛️ Electrode Placement
+## Electrode Placement
 Add the following image to your project folder:
 - `electrode-placement.png`
 
@@ -41,7 +41,7 @@ Add the following image to your project folder:
 
 ---
 
-## 🎮 Controls & Key Mapping
+## Controls & Key Mapping
 | Action                | Key Sent |
 |-----------------------|----------|
 | Look Left (EOG)       | `a`      |
@@ -52,7 +52,7 @@ Add the following image to your project folder:
 - **All keys are configurable** at the top of the code (`#define EOG_LEFT_KEY`, etc.)
 ---
 
-## 🧪 Debug Mode
+## Debug Mode
 - Set `#define DEBUG_LEVEL` at the top of the code:
   - `0` = Off (default)
   - `1` = Jaw debug (prints jaw envelope)
@@ -61,7 +61,7 @@ Add the following image to your project folder:
 
 ---
 
-## ⚙️ Adjustable Parameters
+## Adjustable Parameters
 You can tune these in the code to fit your needs:
 
 | Name                    | Purpose                        | Default |
@@ -79,7 +79,7 @@ You can tune these in the code to fit your needs:
 
 ---
 
-## 📝 How It Works (Signal Pipeline)
+## How It Works (Signal Pipeline)
 1. **Raw ADC** (A0) sampled at 500 Hz
 2. **Notch Filter** removes powerline noise (48–52 Hz)
 3. **Eye Path:**
@@ -95,7 +95,7 @@ You can tune these in the code to fit your needs:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 1. Connect electrodes and BioAmp snap cables as shown in the image
 2. Flash the firmware to your NPG Lite board using a USB-C cable
 3. Pair with your computer/phone via Bluetooth (shows as "NPG Lite GAMING")
@@ -103,7 +103,7 @@ You can tune these in the code to fit your needs:
 
 ---
 
-## 📚 More Info
+## More Info
 - [Upside Down Labs](https://upsidedownlabs.tech)
 - [NPG Lite Documentation](https://docs.upsidedownlabs.tech/hardware/bioamp/neuro-play-ground-lite/index.html)
 - [Contact Support](mailto:contact@upsidedownlabs.tech)
