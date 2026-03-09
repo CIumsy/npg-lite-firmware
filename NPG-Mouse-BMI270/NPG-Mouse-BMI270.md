@@ -8,8 +8,8 @@ This project turns the Neuro Playground Lite (NPG) into a hands-free mouse contr
   - Moving your head up/down or left/right moves the mouse cursor on your computer.
 - **Blink Detection & jaw clench → Mouse Clicks:**
   - NPG reads single-channel EOG data.
-  - jaw clench trigger a left mouse click.
-  - Triple blinks trigger a right mouse click.
+  - jaw clench triggers a left mouse click.
+  - Triple blinks triggers a right mouse click.
 
 ## How It Works
 - **Sensors Used:**
@@ -20,7 +20,6 @@ This project turns the Neuro Playground Lite (NPG) into a hands-free mouse contr
   - Sensitivity, deadzone, and acceleration are adjustable for comfort and precision.
 - **Blink Detection:**
   - The EOG signal is filtered and analyzed to detect blinks.
-  - Timing logic distinguishes between double and triple blinks for different mouse clicks.
 - **Calibration:**
   - The headband calibrates itself for neutral position and movement directions using vibration feedback.
 - **BLE Connection:**
@@ -32,7 +31,7 @@ This project turns the Neuro Playground Lite (NPG) into a hands-free mouse contr
 3. Wear the headband and power on NPG.
 4. Calibrate by following vibration feedback.
 5. Move your head to control the mouse cursor.
-6. Jaw clench for left click, three times for right click.
+6. Jaw clench for left click, blink three times for right click.
 
 ---
 

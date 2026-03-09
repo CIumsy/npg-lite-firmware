@@ -37,7 +37,7 @@
 
 //  BASIC SETTINGS (ADJUST THESE TO FINE-TUNE)
 #define MOUSE_UPDATE_RATE   12               // Update frequency: LOWER = faster updates (8-20)
-#define DEADZONE            0.01               // Rest zone: HIGHER = easier to stop (0.3-2.0) degrees
+#define DEADZONE            0.3               // Rest zone: HIGHER = easier to stop (0.3-2.0) degrees
 #define MIN_SENSITIVITY     0.15             // Slowest speed: LOWER = more precise (0.1-0.5)
 #define MAX_SENSITIVITY     8.0              // Fastest speed: LOWER = more controlled (4.0-15.0)
 
