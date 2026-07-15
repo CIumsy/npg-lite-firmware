@@ -247,16 +247,13 @@ void setup() {
 
 void loop() {
   // ── EMG sampling at SAMPLE_RATE ──────────────────────────────
-  static unsigned long lastMicros = micros();
-  static long emgTimer = 0;
+  static unsigned long lastEmgMicros = micros();
+  static unsigned long lastMouseMillis = millis();
+  static unsigned long lastPrintMillis = millis();
 
-  unsigned long now = micros();
-  unsigned long dt = now - lastMicros;
-  lastMicros = now;
-  emgTimer -= dt;
-
-  if (emgTimer <= 0) {
-    emgTimer += 1000000L / SAMPLE_RATE;
+  unsigned long nowMicros = micros();
+  if (nowMicros - lastEmgMicros >= 1000000UL / SAMPLE_RATE) {
+    lastEmgMicros = nowMicros;
 
     int rawEMG = analogRead(EMG_PIN);
     float notched = notchEMG.process((float)rawEMG);
@@ -275,14 +272,23 @@ void loop() {
       }
     }
 
-    Serial.println(envelope);  // for threshold tuning
+    unsigned long nowMillis = millis();
+    if (nowMillis - lastPrintMillis >= 50) {
+      Serial.println(envelope);  // for threshold tuning
+      lastPrintMillis = nowMillis;
+    }
   }
 
   // ── Mouse movement ───────────────────────────────────────────
   if (!Keyboard.isConnected()) {
-    delay(100);
     return;
   }
+
+  unsigned long nowMillis = millis();
+  if (nowMillis - lastMouseMillis < POLL_MS) {
+    return;
+  }
+  lastMouseMillis = nowMillis;
 
   mpu6050.update();
 
@@ -299,5 +305,4 @@ void loop() {
     Mouse.move((signed char)dx, (signed char)dy);
   }
 
-  delay(POLL_MS);
 }
