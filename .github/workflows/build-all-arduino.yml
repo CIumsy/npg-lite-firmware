@@ -2,8 +2,11 @@ name: Build & Release Firmware for ESP32-C6
 
 on:
   push:
-    tags:
-      - '*.*.*' 
+    branches:
+      - main 
+
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
@@ -13,11 +16,20 @@ jobs:
     steps:
     - name: 📦 Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🏷️ Generate timestamp tag
+      id: gen-tag
+      run: |
+        TAG=$(date -u +'%Y.%m.%d-%H%M')-${GITHUB_SHA::7}
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        echo "Generated tag: $TAG"
 
     - name: 🔍 Check if release already exists
       id: check-release
       run: |
-        TAG="${{ github.ref_name }}"
+        TAG="${{ steps.gen-tag.outputs.tag }}"
         if gh release view "$TAG" > /dev/null 2>&1; then
           echo "exists=true" >> $GITHUB_OUTPUT
         else
@@ -26,10 +38,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: 🏷️ Create and push git tag
+      if: steps.check-release.outputs.exists == 'false'
+      run: |
+        TAG="${{ steps.gen-tag.outputs.tag }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag "$TAG"
+        git push origin "$TAG"
+
     - name: 🛑 Skip if release exists
       if: steps.check-release.outputs.exists == 'true'
       run: |
-        echo "✅ Release already exists for tag ${{ github.ref_name }} — skipping build."
+        echo "✅ Release already exists for tag ${{ steps.gen-tag.outputs.tag }} — skipping build."
 
     - name: 🔧 Setup Arduino CLI
       if: steps.check-release.outputs.exists == 'false'
@@ -66,9 +87,26 @@ jobs:
       if: steps.check-release.outputs.exists == 'false'
       run: |
         mkdir -p artifacts
-        find compiled_binaries -name "*.ino.bin" -exec cp {} artifacts \;
-        echo "=== Artifacts (.ino.bin only) ==="
+
+        for dir in compiled_binaries/*/; do
+          project=$(basename "$dir")
+          mkdir -p "artifacts/$project"
+          find "$dir" -name "*.bin" -exec cp {} "artifacts/$project/" \;
+        done
+
+        echo "=== Per-project binary folders ==="
+        find artifacts -type d -mindepth 1 -exec sh -c 'echo "{}:"; ls -lh "{}"' \;
+
+        cd artifacts
+        for d in */; do
+          zip -r "${d%/}.zip" "$d"
+          rm -rf "$d"
+        done
+        cd ..
+
+        echo "=== Final release assets ==="
         ls -lh artifacts
+
         echo "=== Failed Build Logs ==="
         find compiled_binaries -name "compile.log" -exec sh -c 'echo "\n{}:"; cat {}' \;
 
@@ -77,15 +115,15 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: firmware-binaries
-        path: artifacts/*.bin
+        path: artifacts/*.zip
 
     - name: 🏷️ Create GitHub Release
       if: steps.check-release.outputs.exists == 'false'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        body: Automatic release of firmware version ${{ github.ref_name }}
-        files: artifacts/*.bin
+        tag_name: ${{ steps.gen-tag.outputs.tag }}
+        name: Release ${{ steps.gen-tag.outputs.tag }}
+        body: Automatic release of firmware version ${{ steps.gen-tag.outputs.tag }}
+        files: artifacts/*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
