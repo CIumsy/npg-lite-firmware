@@ -83,26 +83,29 @@ jobs:
         chmod +x ./build_all_esp32c6.sh
         ./build_all_esp32c6.sh || true
 
-    - name: 📦 Package artifacts
+    - name: 📦 Package artifacts (merged.bin only, one flat file per project)
       if: steps.check-release.outputs.exists == 'false'
       run: |
         mkdir -p artifacts
 
+        found_any=false
         for dir in compiled_binaries/*/; do
           project=$(basename "$dir")
-          mkdir -p "artifacts/$project"
-          find "$dir" -name "*.bin" -exec cp {} "artifacts/$project/" \;
+          merged_file=$(find "$dir" -iname "*.ino.merged.bin" | head -n 1)
+
+          if [ -n "$merged_file" ]; then
+            cp "$merged_file" "artifacts/${project}.ino.merged.bin"
+            found_any=true
+            echo "✓ $project -> ${project}.ino.merged.bin"
+          else
+            echo "⚠ No merged.bin found for $project (build may have failed — check compile.log)"
+          fi
         done
 
-        echo "=== Per-project binary folders ==="
-        find artifacts -type d -mindepth 1 -exec sh -c 'echo "{}:"; ls -lh "{}"' \;
-
-        cd artifacts
-        for d in */; do
-          zip -r "${d%/}.zip" "$d"
-          rm -rf "$d"
-        done
-        cd ..
+        if [ "$found_any" = false ]; then
+          echo "❌ No merged.bin files were produced by any project."
+          exit 1
+        fi
 
         echo "=== Final release assets ==="
         ls -lh artifacts
@@ -115,7 +118,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: firmware-binaries
-        path: artifacts/*.zip
+        path: artifacts/*.bin
 
     - name: 🏷️ Create GitHub Release
       if: steps.check-release.outputs.exists == 'false'
@@ -124,6 +127,6 @@ jobs:
         tag_name: ${{ steps.gen-tag.outputs.tag }}
         name: Release ${{ steps.gen-tag.outputs.tag }}
         body: Automatic release of firmware version ${{ steps.gen-tag.outputs.tag }}
-        files: artifacts/*.zip
+        files: artifacts/*.bin
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
