@@ -2,8 +2,11 @@ name: Build & Release Firmware for ESP32-C6
 
 on:
   push:
-    tags:
-      - '*.*.*' 
+    branches:
+      - main 
+
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
@@ -13,11 +16,20 @@ jobs:
     steps:
     - name: 📦 Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🏷️ Generate timestamp tag
+      id: gen-tag
+      run: |
+        TAG=$(date -u +'%Y.%m.%d-%H%M')-${GITHUB_SHA::7}
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        echo "Generated tag: $TAG"
 
     - name: 🔍 Check if release already exists
       id: check-release
       run: |
-        TAG="${{ github.ref_name }}"
+        TAG="${{ steps.gen-tag.outputs.tag }}"
         if gh release view "$TAG" > /dev/null 2>&1; then
           echo "exists=true" >> $GITHUB_OUTPUT
         else
@@ -26,10 +38,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: 🏷️ Create and push git tag
+      if: steps.check-release.outputs.exists == 'false'
+      run: |
+        TAG="${{ steps.gen-tag.outputs.tag }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag "$TAG"
+        git push origin "$TAG"
+
     - name: 🛑 Skip if release exists
       if: steps.check-release.outputs.exists == 'true'
       run: |
-        echo "✅ Release already exists for tag ${{ github.ref_name }} — skipping build."
+        echo "✅ Release already exists for tag ${{ steps.gen-tag.outputs.tag }} — skipping build."
 
     - name: 🔧 Setup Arduino CLI
       if: steps.check-release.outputs.exists == 'false'
@@ -62,13 +83,33 @@ jobs:
         chmod +x ./build_all_esp32c6.sh
         ./build_all_esp32c6.sh || true
 
-    - name: 📦 Package artifacts
+    - name: 📦 Package artifacts (merged.bin only, one flat file per project)
       if: steps.check-release.outputs.exists == 'false'
       run: |
         mkdir -p artifacts
-        find compiled_binaries -name "*.ino.bin" -exec cp {} artifacts \;
-        echo "=== Artifacts (.ino.bin only) ==="
+
+        found_any=false
+        for dir in compiled_binaries/*/; do
+          project=$(basename "$dir")
+          merged_file=$(find "$dir" -iname "*.ino.merged.bin" | head -n 1)
+
+          if [ -n "$merged_file" ]; then
+            cp "$merged_file" "artifacts/${project}.ino.merged.bin"
+            found_any=true
+            echo "✓ $project -> ${project}.ino.merged.bin"
+          else
+            echo "⚠ No merged.bin found for $project (build may have failed — check compile.log)"
+          fi
+        done
+
+        if [ "$found_any" = false ]; then
+          echo "❌ No merged.bin files were produced by any project."
+          exit 1
+        fi
+
+        echo "=== Final release assets ==="
         ls -lh artifacts
+
         echo "=== Failed Build Logs ==="
         find compiled_binaries -name "compile.log" -exec sh -c 'echo "\n{}:"; cat {}' \;
 
@@ -83,9 +124,9 @@ jobs:
       if: steps.check-release.outputs.exists == 'false'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        body: Automatic release of firmware version ${{ github.ref_name }}
+        tag_name: ${{ steps.gen-tag.outputs.tag }}
+        name: Release ${{ steps.gen-tag.outputs.tag }}
+        body: Automatic release of firmware version ${{ steps.gen-tag.outputs.tag }}
         files: artifacts/*.bin
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
