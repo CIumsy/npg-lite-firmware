@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>NPG IR Controller</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="hdr">
+    <img class="logo light-only" src="assets/udl_logo_black.svg" alt="Upside Down Labs">
+    <img class="logo dark-only" src="assets/udl_logo_white.svg" alt="Upside Down Labs">
+    <div class="hdr-actions">
+      <button class="icon-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">
+        <svg class="light-only" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1M12.95 3.05l-1.06 1.06M4.11 11.89l-1.06 1.06M12.95 12.95l-1.06-1.06M4.11 4.11L3.05 3.05"/></svg>
+        <svg class="dark-only" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-info" title="How to use" aria-label="How to use">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.25v4M8 4.75h.01"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="statusbar">
+    <span class="dot" id="dot" aria-hidden="true"></span>
+    <span class="status-txt" id="status">Not connected</span>
+    <button class="btn btn-sm" id="btn-conn">Connect</button>
+  </div>
+
+  <main class="main">
+
+    <div class="section-hdr">
+      <span class="section-ttl">Commands</span>
+      <span class="badge" id="count">0</span>
+      <button class="icon-btn icon-btn-sm" id="btn-refresh" title="Refresh list" aria-label="Refresh list" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8a6 6 0 1 1-1.76-4.24"/><path d="M14 2v3.5h-3.5"/></svg>
+      </button>
+    </div>
+
+    <ul class="list" id="list"></ul>
+
+    <div class="empty" id="empty">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>
+      <p id="empty-txt">Connect to your NPG board to load commands.</p>
+    </div>
+
+  </main>
+
+  <footer class="ftr">
+    <div class="active-row">
+      <span class="active-lbl">Active</span>
+      <span class="active-nm none" id="active-nm">None</span>
+    </div>
+    <button class="btn btn-primary btn-fire" id="btn-fire" disabled>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v6"/><path d="M4.5 4.2a5 5 0 1 0 7 0"/></svg>
+      Fire
+    </button>
+  </footer>
+
+</div>
+
+
+<!-- Listening -->
+<div class="overlay" id="ov-listening">
+  <div class="modal modal-sm">
+    <div class="modal-body listen">
+      <div class="waves" aria-hidden="true">
+        <span class="wave"></span>
+        <span class="wave"></span>
+        <span class="wave"></span>
+        <span class="wave-core"></span>
+      </div>
+      <h2 class="listen-ttl">Listening for a signal</h2>
+      <p class="prose listen-sub">Point your remote at the board and press any key.</p>
+      <div class="progress"><span class="progress-bar" id="listen-bar"></span></div>
+      <span class="listen-time" id="listen-time"></span>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" id="listen-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Capture -->
+<div class="overlay" id="ov-capture">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl" id="cap-ttl">IR signal captured</h2>
+      <button class="icon-btn icon-btn-sm" data-close="ov-capture" aria-label="Close">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="cap-dup"></div>
+      <dl class="meta" id="cap-meta"></dl>
+      <label class="field">
+        <span class="field-lbl">Name</span>
+        <input class="input" id="cap-input" maxlength="16" placeholder="TV Power" autocomplete="off">
+        <span class="field-hint"><span id="cap-count">0</span>/16 characters</span>
+      </label>
+    </div>
+    <div class="modal-ftr" id="cap-actions"></div>
+  </div>
+</div>
+
+<!-- Rename -->
+<div class="overlay" id="ov-rename">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">Rename command</h2>
+      <button class="icon-btn icon-btn-sm" data-close="ov-rename" aria-label="Close">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span class="field-lbl">Name</span>
+        <input class="input" id="ren-input" maxlength="16" autocomplete="off">
+        <span class="field-hint"><span id="ren-count">0</span>/16 characters</span>
+      </label>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" data-close="ov-rename">Cancel</button>
+      <button class="btn btn-primary" id="ren-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="overlay" id="ov-confirm">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl" id="cfm-ttl">Are you sure?</h2>
+      <button class="icon-btn icon-btn-sm" data-close="ov-confirm" aria-label="Close">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="prose" id="cfm-body"></p>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" data-close="ov-confirm">Cancel</button>
+      <button class="btn btn-danger" id="cfm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info -->
+<div class="overlay" id="ov-info">
+  <div class="modal modal-lg">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">How to use</h2>
+      <button class="icon-btn icon-btn-sm" data-close="ov-info" aria-label="Close">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="modal-body modal-scroll">
+
+      <section class="info-sec">
+        <h3 class="info-ttl">Getting started</h3>
+        <ol class="steps">
+          <li>Power the NPG board and press <b>Connect</b>. Pick <b>NPG-IR</b> from the browser dialog.</li>
+          <li><b>Hold</b> the user button for 1.5 seconds and let go. The app shows a listening overlay.</li>
+          <li>Point a remote at the board and press a key. The capture dialog opens here. Type a name and save it.</li>
+          <li><b>Short press</b> the user button to fire the active command, or use the Fire button.</li>
+        </ol>
+      </section>
+
+      <section class="info-sec">
+        <h3 class="info-ttl">The user button</h3>
+        <dl class="meta">
+          <dt>Short press</dt><dd>Fires the active command</dd>
+          <dt>Hold 1.5s</dt><dd>Starts recording, then you can let go</dd>
+          <dt>While recording</dt><dd>A short press cancels it</dd>
+        </dl>
+        <p class="prose">Recording stays on after you release the button. It ends when a signal arrives, after 15 seconds, or when you cancel. While a capture is waiting to be named, the button does nothing. Name it or discard it first.</p>
+      </section>
+
+      <section class="info-sec">
+        <h3 class="info-ttl">How it is stored</h3>
+        <p class="prose">Each command is split across two places on the board. Names and the active slot live in <b>NVS</b>. The captured waveform lives in <b>LittleFS</b>. A capture stays in RAM only until you name it, so a reboot before naming loses it.</p>
+        <dl class="meta">
+          <dt>NVS</dt><dd>20 KB, about 250 names</dd>
+          <dt>LittleFS</dt><dd>1 MB, about 250 signals</dd>
+          <dt>This build</dt><dd>50 commands, 16 characters each</dd>
+        </dl>
+        <p class="prose">Both survive a firmware upload. Use Erase all below to clear them, or run a full chip erase from the command line. Flash the board with the <b>Huge APP (3MB No OTA/1MB SPIFFS)</b> partition scheme, otherwise the sketch barely fits.</p>
+      </section>
+
+      <section class="info-sec">
+        <h3 class="info-ttl">Requirements</h3>
+        <p class="prose">Web Bluetooth works in Chrome and Edge on desktop and Android. Firefox and Safari do not support it. On Android, Location must be on for Bluetooth scanning.</p>
+      </section>
+
+      <section class="info-sec danger-zone">
+        <h3 class="info-ttl">Erase all</h3>
+        <p class="prose">Removes every saved name and waveform from the board. This cannot be undone.</p>
+        <button class="btn btn-danger" id="btn-wipe" disabled>Erase all commands</button>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="js/ble.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
