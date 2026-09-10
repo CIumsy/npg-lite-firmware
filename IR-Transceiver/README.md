@@ -163,3 +163,9 @@ notifications and one for writes.
 Firing, listing, erasing and cancelling a recording are handled on the main loop
 rather than inside the Bluetooth callback, because that callback runs on a task with
 a much smaller stack than the IR and filesystem code needs.
+
+---
+
+Making neuroscience affordable and accessible for everyone
+
+**[Upside Down Labs](https://upsidedownlabs.in)**
