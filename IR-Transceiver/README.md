@@ -27,6 +27,39 @@ SDA and SCL are just the wire names on the STEMMA cable. They carry the transcei
 Out and In signals, and the firmware drives them as ordinary GPIO rather than as an
 I2C bus. Both pins are macros at the top of `IR-Transceiver.ino`.
 
+### Status LEDs
+
+The onboard NeoPixel ring reports two things at a glance. Pixel numbering
+matches the rest of the NPG Lite firmware.
+
+| Pixel | Reports | Colours |
+| --- | --- | --- |
+| 0 | Bluetooth | red not connected, green connected, blue flash when a command fires |
+| 5 | Battery | red at or below 20%, amber at or below 70%, green above |
+
+Battery is sampled from `A6` in millivolts every 100 ms, averaged and mapped
+through a voltage lookup table every 30 seconds, the same one the other NPG Lite
+sketches use. The percentage only rises after three consecutive higher readings,
+so the colour does not flicker under load.
+
+Nothing is written to the ring while the receiver is armed. Pushing pixel data
+briefly disables interrupts, which can cost the IR receiver an edge mid-capture,
+so the ring is left alone until recording ends.
+
+### Checking the transceiver is connected
+
+The firmware cannot tell you this. The module is wired as two plain GPIO lines
+with nothing to interrogate, so read its own indicators instead.
+
+| Indicator | Meaning |
+| --- | --- |
+| Green power LED | The module has 3V3 and ground. If this is dark, check the cable. |
+| OUT and IN LEDs | Each flashes once as a signal passes through it. |
+
+Fire a saved command with a short press of the user button. Both the OUT and IN
+LEDs should blink once. Green power LED but no blink means the module is powered
+yet its signal pins are not reaching the board, so check pins 22 and 23.
+
 ### The user button
 
 The sketch reads GPIO 9, which is the boot button on the NPG Lite and on most
@@ -51,8 +84,9 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
 ### Arduino IDE
 
 1. Download and install the [Arduino IDE](https://www.arduino.cc/en/software).
-2. Install `IRremoteESP8266` (tested against 2.9.0) from the Library Manager.
-   Go to **Tools -> Manage Libraries**.
+2. Install these from the Library Manager, under **Tools -> Manage Libraries**.
+   - `IRremoteESP8266` (tested against 2.9.0)
+   - `Adafruit NeoPixel`
 3. Install **ESP32 (version 3.2.0)** by Espressif Systems from the Boards Manager.
    Go to **Tools -> Board -> Boards Manager**.
 4. Open `IR-Transceiver.ino` from this folder. If you would rather paste the code into

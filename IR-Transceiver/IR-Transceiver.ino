@@ -23,7 +23,7 @@
 // By supporting us with your purchase, you help spread innovation and open science.
 // Thank you for being part of this journey with us!
 
-// ESP32 based IR Controller using Adafruit IR Transceiver via I2C
+// ESP32 based IR Controller using an Adafruit IR Transceiver on two GPIO lines
 // Hold the user button to record an IR signal, short press to fire the active one.
 // Names and the active slot live in NVS. Captured waveforms live in LittleFS.
 
@@ -38,11 +38,20 @@
 #include <IRrecv.h>
 #include <IRsend.h>
 #include <IRutils.h>
+#include <Adafruit_NeoPixel.h>
 
 // Pins
 #define IR_RECV_PIN     23
 #define IR_SEND_PIN     22
 #define USER_BTN_PIN    9
+
+// NeoPixel status ring. Pixel 0 BLE, pixel 5 battery.
+#define PIN_NEOPIXEL        15
+#define PIXEL_COUNT         6
+#define BLE_LED             0
+#define BATTERY_LED         5
+#define BLUE_LED_DURATION   100
+#define BATTERY_VOLTAGE_PIN A6
 
 // Timing
 #define HOLD_THRESHOLD  1500
@@ -91,6 +100,37 @@
 IRrecv irrecv(IR_RECV_PIN, RAW_BUF_LEN, IR_TIMEOUT_MS, true);
 IRsend irsend(IR_SEND_PIN);
 Preferences prefs;
+Adafruit_NeoPixel pixel(PIXEL_COUNT, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+
+// NeoPixel state
+uint32_t bleColor     = 0;
+uint32_t batteryColor = 0;
+
+uint32_t shownBleColor     = 0xFFFFFFFF;
+uint32_t shownBatteryColor = 0xFFFFFFFF;
+
+unsigned long lastCmdSentMs = 0;
+
+// ---- Battery ----
+#define BATTERY_CHECK_MS   30000   // read the battery every 30 s
+#define BATTERY_SAMPLE_MS  100     // accumulate a reading this often
+
+unsigned long lastBatteryCheck = 0;
+unsigned long lastBatterySample = 0;
+uint32_t batteryWinSum = 0;
+uint16_t batteryWinCount = 0;
+int lastBatteryPct = -1;
+uint8_t risingCount = 0;
+const uint8_t RISING_THRESHOLD = 3;
+const float voltageLUT[] = {
+  3.27, 3.61, 3.69, 3.71, 3.73, 3.75, 3.77, 3.79, 3.80, 3.82,
+  3.84, 3.85, 3.87, 3.91, 3.95, 3.98, 4.02, 4.08, 4.11, 4.15, 4.20
+};
+const int percentLUT[] = {
+  0, 5, 10, 15, 20, 25, 30, 35, 40, 45,
+  50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+};
+const int lutSize = sizeof(voltageLUT) / sizeof(voltageLUT[0]);
 
 struct CmdEntry {
   bool exists;
@@ -268,6 +308,8 @@ bool fireCommand(int id) {
   Serial.printf("[IR] fire %d proto=%s bits=%d\n",
                 id, typeToString(res.decode_type).c_str(), res.bits);
 
+  lastCmdSentMs = millis();
+
   if (res.decode_type == UNKNOWN) {
     // rawbuf holds capture ticks, sendRaw wants microseconds
     uint16_t len = getCorrectedRawLength(&res);
@@ -336,6 +378,77 @@ void notifySaved(int id) {
   buf[2] = nlen;
   memcpy(&buf[3], cmds[id].name, nlen);
   bleNotify(buf, 3 + nlen);
+}
+
+// NeoPixel status ------------------------------------------------
+float interpolatePercentage(float voltage) {
+  if (voltage <= voltageLUT[0])
+    return 0;
+  if (voltage >= voltageLUT[lutSize - 1])
+    return 100;
+  int i = 0;
+  while (i < lutSize - 1 && voltage > voltageLUT[i + 1])
+    i++;
+  float v1 = voltageLUT[i], v2 = voltageLUT[i + 1];
+  int p1 = percentLUT[i], p2 = percentLUT[i + 1];
+  return p1 + (voltage - v1) * (p2 - p1) / (v2 - v1);
+}
+
+int getCurrentBatteryPercentage() {
+  // the divide below expects millivolts, so the fallback reads them too
+  float avgRaw = (batteryWinCount > 0) ? (batteryWinSum / batteryWinCount)
+                                       : analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
+  batteryWinSum = 0;
+  batteryWinCount = 0;
+  float voltage = (avgRaw / 1000.0) * 2;
+  voltage += 0.022;
+  float percentage = interpolatePercentage(voltage);
+  if (lastBatteryPct == -1) {
+    lastBatteryPct = (int)percentage;
+  } else if ((int)percentage < lastBatteryPct) {
+    lastBatteryPct = (int)percentage;
+    risingCount = 0;
+  } else if ((int)percentage > lastBatteryPct) {
+    risingCount++;
+    if (risingCount >= RISING_THRESHOLD) {
+      lastBatteryPct = (int)percentage;
+      risingCount = 0;
+    }
+  } else {
+    risingCount = 0;
+  }
+  return lastBatteryPct;
+}
+
+// Turns a battery percentage into the color for the battery led.
+uint32_t batteryPercentToColor(int percent) {
+  if (percent <= 20) return pixel.Color(20, 0, 0);
+  if (percent <= 70) return pixel.Color(35, 7, 0);
+  return pixel.Color(0, 20, 0);
+}
+
+// Writes both leds and shows them, but only when a color changed.
+void updateStatusLeds(bool connected, unsigned long nowMs) {
+  // Bluetooth led: red until connected, blue while a command is firing,
+  // green when connected but idle.
+  if (nowMs - lastCmdSentMs < BLUE_LED_DURATION) {
+    bleColor = pixel.Color(0, 0, 30);
+  } else if (!connected) {
+    bleColor = pixel.Color(20, 0, 0);
+  } else {
+    bleColor = pixel.Color(0, 20, 0);
+  }
+
+  if (bleColor == shownBleColor && batteryColor == shownBatteryColor) {
+    return;
+  }
+
+  shownBleColor = bleColor;
+  shownBatteryColor = batteryColor;
+
+  pixel.setPixelColor(BLE_LED, bleColor);
+  pixel.setPixelColor(BATTERY_LED, batteryColor);
+  pixel.show();
 }
 
 void startRecording() {
@@ -497,7 +610,20 @@ void setup() {
   pinMode(USER_BTN_PIN, INPUT_PULLUP);
   irsend.begin();
 
+  pinMode(BATTERY_VOLTAGE_PIN, INPUT);
+  pixel.begin();
+  pixel.clear();
+  pixel.show();
+
+  int currentBattery = getCurrentBatteryPercentage();
+  batteryColor = batteryPercentToColor(currentBattery);
+  Serial.printf("[BATT] %d%%\n", currentBattery);
+
   if (!LittleFS.begin(true)) Serial.println("[FS] mount failed");
+
+  updateStatusLeds(false, millis());   // battery on, bluetooth red
+  lastBatteryCheck = millis();         // the battery was just read above
+
   nvsLoad();
 
   BLEDevice::init(BLE_NAME);
@@ -527,6 +653,19 @@ uint32_t lastRelease = 0;
 
 void loop() {
   uint32_t now = millis();
+
+  if (now - lastBatterySample >= BATTERY_SAMPLE_MS) {
+    lastBatterySample = now;
+    batteryWinSum += analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
+    batteryWinCount++;
+  }
+  if (now - lastBatteryCheck >= BATTERY_CHECK_MS) {
+    lastBatteryCheck = now;
+    batteryColor = batteryPercentToColor(getCurrentBatteryPercentage());
+  }
+  // show() briefly disables interrupts, which can cost the receiver an edge,
+  // so the ring is left alone while it is armed
+  if (!recording) updateStatusLeds(bleConnected, now);
 
   // Deferred work from the BLE callback
   if (reqFire >= 0) {
