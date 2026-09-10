@@ -36,6 +36,7 @@ const BLE = (() => {
     FIRE:       0x07,
     WIPE:       0x08,
     CANCEL_REC: 0x09,
+    DISCARD:    0x0A,
   };
 
   const PROTOCOLS = {
@@ -164,7 +165,7 @@ const BLE = (() => {
       case EV.FAIL:       emit('failed');                break;
       case EV.WIPED:      emit('wiped');                 break;
       case EV.LISTENING:  emit('listening', d[1] || 15); break;
-      case EV.LISTEN_END: emit('listenEnd');             break;
+      case EV.LISTEN_END: emit('listenEnd', d[1] ?? 2);  break;
     }
   }
 
@@ -179,11 +180,13 @@ const BLE = (() => {
   const fire      = id           => send([CMD.FIRE, id]);
   const wipe      = ()           => send([CMD.WIPE]);
   const cancelRec = ()           => send([CMD.CANCEL_REC]);
+  const discard   = ()           => send([CMD.DISCARD]);
 
   return {
     MAX_NAME, DEVICE_NAME,
     on, connect, disconnect, isConnected, isSupported, protocolName,
-    setActive, remove, rename, saveNew, saveOver, getList, fire, wipe, cancelRec,
+    setActive, remove, rename, saveNew, saveOver, getList, fire, wipe,
+    cancelRec, discard,
   };
 
 })();

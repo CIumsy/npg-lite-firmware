@@ -86,6 +86,7 @@
 #define CMD_FIRE        0x07   // [id]
 #define CMD_WIPE        0x08   
 #define CMD_CANCEL_REC  0x09
+#define CMD_DISCARD     0x0A
 
 IRrecv irrecv(IR_RECV_PIN, RAW_BUF_LEN, IR_TIMEOUT_MS, true);
 IRsend irsend(IR_SEND_PIN);
@@ -283,6 +284,7 @@ bool fireCommand(int id) {
 }
 
 void wipeAll() {
+  stopRecording(2);
   for (int i = 0; i < MAX_COMMANDS; i++) {
     deleteIR(i);
     cmds[i].exists  = false;
@@ -337,7 +339,10 @@ void notifySaved(int id) {
 }
 
 void startRecording() {
-  if (recording || pendingValid) return;
+  if (recording) return;
+  // a new recording supersedes a capture that was never named, so an
+  // abandoned one can never block the button
+  pendingValid = false;
   recording = true;
   recordAt  = millis();
   irrecv.enableIRIn();
@@ -372,6 +377,9 @@ class ServerCB : public BLEServerCallbacks {
   void onDisconnect(BLEServer* s) override {
     bleConnected = false;
     reqList      = false;
+    // nothing can name a capture now, and only loop() may touch the receiver
+    pendingValid = false;
+    reqCancel    = true;
     Serial.println("[BLE] disconnected");
     s->getAdvertising()->start();
   }
@@ -468,6 +476,11 @@ class WriteCB : public BLECharacteristicCallbacks {
       case CMD_WIPE:       reqWipe   = true; return;
       case CMD_CANCEL_REC: reqCancel = true; return;
 
+      case CMD_DISCARD:
+        pendingValid = false;
+        Serial.println("[CMD] capture discarded");
+        return;
+
       case CMD_FIRE:
         if (n < 2) return;
         reqFire = d[1];
@@ -551,8 +564,7 @@ void loop() {
         btnState    = IDLE;
         // short press: cancel a recording if one is running, otherwise fire
         if (recording) stopRecording(1);
-        else if (!pendingValid && !fireCommand(activeId))
-          Serial.println("[BTN] nothing to fire");
+        else if (!fireCommand(activeId)) Serial.println("[BTN] nothing to fire");
       } else if ((now - btnPressed) >= HOLD_THRESHOLD) {
         btnState = HELD;
         startRecording();

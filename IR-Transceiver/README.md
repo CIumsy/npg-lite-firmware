@@ -98,6 +98,7 @@ notifications and one for writes.
 | `0x07` fire | id |
 | `0x08` erase everything | |
 | `0x09` cancel recording | |
+| `0x0A` discard pending capture | |
 
 | Board to app | Payload |
 | --- | --- |

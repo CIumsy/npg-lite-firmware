@@ -270,6 +270,14 @@
     guard(() => BLE.cancelRec());
   }
 
+  // the board holds the capture in RAM, so every way of dismissing this
+  // dialog has to tell it to let go or the button stays stuck
+  function discardCapture() {
+    closeModal('ov-capture');
+    capture = null;
+    guard(() => BLE.discard());
+  }
+
   /* capture flow --------------------------------------------- */
 
   function showCapture(data) {
@@ -300,10 +308,7 @@
     el.capInput.classList.remove('invalid');
 
     el.capActions.replaceChildren();
-    addCaptureAction('Discard', 'btn', () => {
-      closeModal('ov-capture');
-      capture = null;
-    });
+    addCaptureAction('Discard', 'btn', discardCapture);
     if (data.isDuplicate) {
       addCaptureAction('Replace', 'btn btn-danger', () => {
         const name = el.capInput.value.trim() || dupName;
@@ -358,6 +363,10 @@
     loading = false;
     clearTimeout(listTimer);
     hideListening();
+    // the board drops its pending capture on disconnect, so close the
+    // dialog rather than leaving a Save button that cannot work
+    closeModal('ov-capture');
+    capture = null;
     setConnectedUI(false);
     setStatus('Not connected');
     render();
@@ -498,26 +507,30 @@
     });
   }
 
+  // two overlays mirror state the board is holding, so closing them has to
+  // tell the board. every dismissal route goes through here.
+  function dismiss(id) {
+    if (id === 'ov-listening') cancelListening();
+    else if (id === 'ov-capture') discardCapture();
+    else closeModal(id);
+  }
+
   document.querySelectorAll('[data-close]').forEach(btn => {
-    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+    btn.addEventListener('click', () => dismiss(btn.dataset.close));
   });
 
   el.listenX.addEventListener('click', cancelListening);
 
-  // dismissing the listening overlay has to tell the board to stop, so it
-  // never closes silently the way the other overlays do
   document.querySelectorAll('.overlay').forEach(overlay => {
     overlay.addEventListener('mousedown', e => {
-      if (e.target !== overlay) return;
-      if (overlay.id === 'ov-listening') cancelListening();
-      else overlay.classList.remove('show');
+      if (e.target === overlay) dismiss(overlay.id);
     });
   });
 
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if ($('ov-listening').classList.contains('show')) { cancelListening(); return; }
-    document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+    const open = document.querySelector('.overlay.show');
+    if (open) dismiss(open.id);
   });
 
   /* start ---------------------------------------------------- */
