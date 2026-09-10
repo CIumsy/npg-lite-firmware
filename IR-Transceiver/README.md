@@ -36,6 +36,11 @@ Many other ESP32 boards put the boot button on GPIO 0.
 
 ## Flashing
 
+Two ways. The web flasher is quicker if you only want to run the firmware. Use the
+Arduino IDE if you plan to change it.
+
+### Web flasher
+
 Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher-Web/).
 
 1. Connect the NPG Lite, or another ESP32-C6 board, over USB.
@@ -43,20 +48,26 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
 3. Press **Get from GitHub** and choose the **IR-Transceiver** firmware.
 4. Flash it.
 
-## Building from source
+### Arduino IDE
 
-Only needed if you are changing the firmware.
+1. Download and install the [Arduino IDE](https://www.arduino.cc/en/software).
+2. Install `IRremoteESP8266` (tested against 2.9.0) from the Library Manager.
+   Go to **Tools -> Manage Libraries**.
+3. Install **ESP32 (version 3.2.0)** by Espressif Systems from the Boards Manager.
+   Go to **Tools -> Board -> Boards Manager**.
+4. Open `IR-Transceiver.ino` from this folder. If you would rather paste the code into
+   a new sketch, save that sketch as `IR-Transceiver` so the folder and the file share
+   a name, which the Arduino IDE requires.
+5. Open the board selector dropdown at the top of the window, the one that reads
+   **Select Board**, and pick your board's COM port. It may show as an ESP32 Family
+   Device.
+6. Go to **Tools -> Board -> ESP32 -> ESP32C6 Dev Module**.
+7. Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
+8. Hit the upload button.
 
-Board: **ESP32C6 Dev Module**.
-
-Partition scheme: **Huge APP (3MB No OTA/1MB SPIFFS)**. This matters. The default
-scheme leaves the sketch at 95% of program storage, which will overflow as soon as
-anything is added. Huge APP brings it to 39% and still leaves 1 MB for signal storage.
-
-Required library: `IRremoteESP8266` (tested against 2.9.0).
-
-The Arduino IDE expects the sketch folder and the `.ino` file to share a name, so keep
-`IR-Transceiver.ino` inside a folder called `IR-Transceiver`.
+Step 7 is not optional. On the default partition scheme the sketch fills 95% of
+program storage and will overflow as soon as anything is added. Huge APP brings it to
+39% and still leaves 1 MB for signal storage.
 
 ## Using the web app
 
