@@ -70,8 +70,19 @@ const BLE = (() => {
      payload guaranteed by the default BLE MTU. Slice by encoded
      bytes rather than characters so multi-byte input cannot overrun. */
   function encodeName(text) {
-    const bytes = encoder.encode(text);
-    return Array.from(bytes.slice(0, MAX_NAME));
+    let bytes = encoder.encode(text);
+    if (bytes.length > MAX_NAME) {
+      bytes = bytes.slice(0, MAX_NAME);
+      // the cut can land inside a character, so drop the partial one.
+      // continuation bytes are 10xxxxxx, a lead byte is anything > 0x7F.
+      while (bytes.length && (bytes[bytes.length - 1] & 0xC0) === 0x80) {
+        bytes = bytes.slice(0, -1);
+      }
+      if (bytes.length && bytes[bytes.length - 1] > 0x7F) {
+        bytes = bytes.slice(0, -1);
+      }
+    }
+    return Array.from(bytes);
   }
 
   function isSupported() {

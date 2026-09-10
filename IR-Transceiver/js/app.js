@@ -188,11 +188,22 @@
     }
   }
 
+  // highlight moves immediately so the click feels instant, but a failed
+  // write would leave the app pointing at a slot the board never took
   function setActive(id) {
     if (id === activeId) return;
+    const previous = activeId;
     activeId = id;
     render();
-    guard(() => BLE.setActive(id));
+    guard(async () => {
+      try {
+        await BLE.setActive(id);
+      } catch (err) {
+        activeId = previous;
+        render();
+        throw err;
+      }
+    });
   }
 
   function confirmDelete(id) {
