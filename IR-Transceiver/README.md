@@ -71,7 +71,14 @@ program storage and will overflow as soon as anything is added. Huge APP brings 
 
 ## Using the web app
 
-Open `index.html` in any Chromium based browser like Chrome, Brave or Edge, or any
+Open
+[NPG-Lite-Arduino-Firmware in BioAmp Arduino Firmware Explorer](https://upsidedownlabs.github.io/BioAmp-Arduino-Firmware-Explorer/?owner=upsidedownlabs&repo=npg-lite-firmware)
+and go to **web app** under **IR-Transceiver**.
+
+Alternatively, download this repo and open `index.html` from the `IR-Transceiver`
+folder in your browser.
+
+Either way you need a Chromium based browser like Chrome, Brave or Edge, or any
 browser with Web Bluetooth. Firefox and Safari do not support it.
 
 Press Connect and pick **NPG-IR**. The command list loads automatically.
