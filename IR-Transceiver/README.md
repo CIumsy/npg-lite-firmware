@@ -1,22 +1,51 @@
-# IR BLE Controller
+# IR Transceiver
 
 Record and replay infrared remote signals on an NPG Lite (ESP32-C6), managed from a
 browser over Bluetooth.
 
-Hold the user button to capture a signal from any IR remote, name it in the web app,
+Hold the user button to record a signal from any IR remote, name it in the web app,
 then replay it with a short press of the button or the Fire button in the app.
 
 ## Hardware
 
-| Signal | Pin |
+| Part | Link |
 | --- | --- |
-| IR receiver out | GPIO 23 |
-| IR emitter in | GPIO 22 |
-| User button | GPIO 9 |
+| Adafruit IR Transceiver | [adafruit.com/product/5990](https://www.adafruit.com/product/5990) |
+| 4-pin JST PH to JST SH cable, STEMMA to QT / Qwiic, 200mm | [adafruit.com/product/4424](https://www.adafruit.com/product/4424) |
+| NPG Lite kit | [upsidedownlabs.in](https://www.upsidedownlabs.in/shop?search=neuro+playground) |
 
-All three are macros at the top of `IR_BLE_Controller.ino`.
+### Wiring
 
-## Building the firmware
+| Adafruit IR Transceiver | Pin | Pin on NPG Lite |
+| --- | --- | --- |
+| Out | SDA | 23 |
+| In | SCL | 22 |
+| Gnd | Gnd | Gnd |
+| Vin | 3v3 | 3v3 |
+
+SDA and SCL are just the wire names on the STEMMA cable. They carry the transceiver's
+Out and In signals, and the firmware drives them as ordinary GPIO rather than as an
+I2C bus. Both pins are macros at the top of `IR-Transceiver.ino`.
+
+### The user button
+
+The sketch reads GPIO 9, which is the boot button on the NPG Lite and on most
+ESP32-C6 boards. On a different dev board this pin will be wrong. Change
+`USER_BTN_PIN` at the top of the sketch to whichever button that board exposes.
+Many other ESP32 boards put the boot button on GPIO 0.
+
+## Flashing
+
+Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher-Web/).
+
+1. Connect the NPG Lite, or another ESP32-C6 board, over USB.
+2. Press **Connect** and pick the **USB JTAG** serial device.
+3. Press **Get from GitHub** and choose the **IR-Transceiver** firmware.
+4. Flash it.
+
+## Building from source
+
+Only needed if you are changing the firmware.
 
 Board: **ESP32C6 Dev Module**.
 
@@ -26,9 +55,13 @@ anything is added. Huge APP brings it to 39% and still leaves 1 MB for signal st
 
 Required library: `IRremoteESP8266` (tested against 2.9.0).
 
+The Arduino IDE expects the sketch folder and the `.ino` file to share a name, so keep
+`IR-Transceiver.ino` inside a folder called `IR-Transceiver`.
+
 ## Using the web app
 
-Open `web/index.html` in any Chromium based browser like Chrome, brave or Edge (or any web-ble supported browser). Firefox and Safari have no Web Bluetooth support.
+Open `index.html` in any Chromium based browser like Chrome, Brave or Edge, or any
+browser with Web Bluetooth. Firefox and Safari do not support it.
 
 Press Connect and pick **NPG-IR**. The command list loads automatically.
 
@@ -47,13 +80,12 @@ storage limits and the Erase all action.
 ## Layout
 
 ```
-IR_BLE_Controller.ino   firmware
-web/index.html          markup
-web/css/style.css       design tokens and all styling
-web/js/ble.js           Bluetooth transport and wire protocol
-web/js/app.js           UI and state
-web/assets/             UDL logo, black for light theme and white for dark
-_old/                   previous single-file web app, kept for reference
+IR-Transceiver.ino   firmware
+index.html           markup
+css/style.css        design tokens and all styling
+js/ble.js            Bluetooth transport and wire protocol
+js/app.js            UI and state
+assets/              UDL logo, black for light theme and white for dark
 ```
 
 `ble.js` never touches the DOM and `app.js` never touches Bluetooth. To change the
@@ -76,11 +108,7 @@ where the single-byte slot id in the protocol runs out.
 Names are capped at 16 characters so every notification fits the 20 byte payload that
 the default Bluetooth MTU guarantees, with no dependency on MTU negotiation.
 
-Both stores survive a firmware upload. Erase all in the app clears them, or:
-
-```
-esptool.py --chip esp32c6 -p COM5 erase_flash
-```
+Both stores survive a firmware upload. Use **Erase all** in the app to clear them.
 
 ## Protocol
 

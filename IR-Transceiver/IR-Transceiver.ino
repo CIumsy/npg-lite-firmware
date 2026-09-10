@@ -492,7 +492,7 @@ class WriteCB : public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("[BOOT] IR BLE Controller");
+  Serial.println("[BOOT] IR Transceiver");
 
   pinMode(USER_BTN_PIN, INPUT_PULLUP);
   irsend.begin();
