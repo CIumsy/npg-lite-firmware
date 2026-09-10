@@ -1,45 +1,55 @@
 /* ============================================================
-   NPG IR Controller
-   Compact mono. One accent, hairline borders, 4px spacing grid.
+   NPG IR Transceiver
+   Compact mono. One accent, hairline borders, 0.25rem spacing grid.
 
    The whole design is driven by the tokens below. Both themes
    share every size and rule and differ only in colour.
+
+   Sizes are in rem so the layout follows the reader's browser
+   font-size preference. 1rem is the browser default, normally
+   16px, and every token is an exact multiple of 1/16rem, so at
+   the default setting this renders identically to a px build.
+   Never set a font-size on :root, that would defeat the point.
+
+   Four things stay in px on purpose, because they should not
+   grow with text: hairline borders (--edge), the focus ring and
+   its offset, the focus glow spread, and the 1px press nudge.
    ============================================================ */
 
 :root {
-  /* spacing - 4px grid, no other values are used anywhere */
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 20px;
-  --s6: 24px;
-  --s7: 32px;
+  /* spacing - 0.25rem grid, no other values are used anywhere */
+  --s1: 0.25rem;    /*  4px */
+  --s2: 0.5rem;     /*  8px */
+  --s3: 0.75rem;    /* 12px */
+  --s4: 1rem;       /* 16px */
+  --s5: 1.25rem;    /* 20px */
+  --s6: 1.5rem;     /* 24px */
+  --s7: 2rem;       /* 32px */
 
   /* type */
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --t-xs: 11px;
-  --t-sm: 12px;
-  --t-md: 13px;
-  --t-lg: 15px;
-  --t-xl: 17px;
+  --t-xs: 0.6875rem; /* 11px */
+  --t-sm: 0.75rem;   /* 12px */
+  --t-md: 0.8125rem; /* 13px */
+  --t-lg: 0.9375rem; /* 15px */
+  --t-xl: 1.0625rem; /* 17px */
 
   /* control heights - only these four exist */
-  --h-icon-sm: 28px;
-  --h-icon: 32px;
-  --h-btn: 34px;
-  --h-fire: 46px;
+  --h-icon-sm: 1.75rem;  /* 28px */
+  --h-icon: 2rem;        /* 32px */
+  --h-btn: 2.125rem;     /* 34px */
+  --h-fire: 2.875rem;    /* 46px */
 
   /* radius - controls, containers, pills. circles use 50% */
-  --r: 6px;
-  --r-lg: 10px;
+  --r: 0.375rem;     /*  6px */
+  --r-lg: 0.625rem;  /* 10px */
   --r-pill: 999px;
 
   --edge: 1px;
   --tap: 200ms cubic-bezier(.4, 0, .2, 1);
-  --shell: 560px;
+  --shell: 35rem;    /* 560px */
 
   /* light palette */
   --bg:           #ffffff;
@@ -124,6 +134,12 @@
 
 html, body { height: 100%; }
 
+/* iOS Safari inflates text in landscape without this */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg-sunken);
@@ -158,7 +174,9 @@ svg {
   border-inline: var(--edge) solid var(--border);
 }
 
-@media (max-width: 600px) {
+/* em in a media query resolves against the browser default, not
+   :root, which is what we want for a layout breakpoint */
+@media (max-width: 37.5em) {   /* 600px */
   .app { border-inline: 0; }
 }
 
@@ -168,13 +186,13 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s3);
-  height: 52px;
+  height: 3.25rem;
   padding-inline: var(--s4);
   border-bottom: var(--edge) solid var(--border);
 }
 
 .logo {
-  height: 20px;
+  height: 1.875rem;
   width: auto;
   display: block;
 }
@@ -191,7 +209,7 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s2);
-  height: 44px;
+  height: 2.75rem;
   padding-inline: var(--s4);
   border-bottom: var(--edge) solid var(--border);
   background: var(--surface-hi);
@@ -199,8 +217,8 @@ svg {
 
 .dot {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: 0.4375rem;
+  height: 0.4375rem;
   border-radius: 50%;
   background: var(--text-faint);
   transition: background var(--tap);
@@ -223,7 +241,7 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s2);
-  height: 38px;
+  height: 2.375rem;
   padding-inline: var(--s4);
   border-bottom: var(--edge) solid var(--border);
 }
@@ -237,9 +255,9 @@ svg {
 }
 
 .badge {
-  min-width: 20px;
-  height: 18px;
-  padding-inline: 6px;
+  min-width: 1.25rem;
+  height: 1.125rem;
+  padding-inline: 0.375rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -271,7 +289,7 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s3);
-  height: 48px;
+  height: 3rem;
   padding-inline: var(--s4);
   border-bottom: var(--edge) solid var(--border);
   cursor: pointer;
@@ -283,8 +301,8 @@ svg {
 
 .radio {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   border: var(--edge) solid var(--border-hi);
   border-radius: 50%;
   transition: border-color var(--tap);
@@ -292,7 +310,7 @@ svg {
 
 .row.active .radio {
   border-color: var(--accent);
-  border-width: 4px;
+  border-width: 0.25rem;
 }
 
 .row-nm {
@@ -336,8 +354,8 @@ svg {
 .empty.show { display: flex; }
 
 .empty svg {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   stroke-width: 1.25;
 }
 
@@ -417,7 +435,7 @@ svg {
   cursor: not-allowed;
 }
 
-.btn svg { width: 15px; height: 15px; }
+.btn svg { width: 0.9375rem; height: 0.9375rem; }
 
 .btn-sm {
   height: var(--h-icon);
@@ -452,10 +470,11 @@ svg {
   font-size: var(--t-lg);
 }
 
-.btn-fire svg { width: 17px; height: 17px; }
+.btn-fire svg { width: 1.0625rem; height: 1.0625rem; }
 
 /* icon buttons ---------------------------------------------- */
 .icon-btn {
+  position: relative;
   width: var(--h-icon);
   height: var(--h-icon);
   display: inline-flex;
@@ -481,19 +500,39 @@ svg {
   cursor: not-allowed;
 }
 
-.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn svg { width: 1rem; height: 1rem; }
 
 .icon-btn-sm {
   width: var(--h-icon-sm);
   height: var(--h-icon-sm);
 }
 
-.icon-btn-sm svg { width: 14px; height: 14px; }
+.icon-btn-sm svg { width: 0.875rem; height: 0.875rem; }
 
 .icon-btn.danger:hover:not(:disabled) {
   background: var(--danger-wash);
   border-color: var(--danger);
   color: var(--danger);
+}
+
+/* touch targets ---------------------------------------------
+   On a finger, WCAG asks for at least 44px. Growing the buttons
+   would change the layout, so grow only the invisible hit area
+   and leave every painted pixel where it is. */
+@media (pointer: coarse) {
+  .icon-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2.75rem;
+    height: 2.75rem;
+    transform: translate(-50%, -50%);
+  }
+
+  /* iOS Safari zooms the whole page when a focused input is
+     under 16px. A slightly larger field beats a lurching page. */
+  .input { font-size: 1rem; }
 }
 
 /* overlay and modal ----------------------------------------- */
@@ -512,7 +551,7 @@ svg {
 
 .modal {
   width: 100%;
-  max-width: 400px;
+  max-width: 25rem;
   max-height: calc(100dvh - var(--s7));
   display: flex;
   flex-direction: column;
@@ -522,14 +561,14 @@ svg {
   overflow: hidden;
 }
 
-.modal-lg { max-width: 480px; }
+.modal-lg { max-width: 30rem; }
 
 .modal-hdr {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--s3);
-  height: 48px;
+  height: 3rem;
   padding-inline: var(--s4);
   border-bottom: var(--edge) solid var(--border);
 }
@@ -563,10 +602,10 @@ svg {
   background: var(--surface-hi);
 }
 
-.modal-ftr .btn { min-width: 84px; }
+.modal-ftr .btn { min-width: 5.25rem; }
 
 /* listening -------------------------------------------------- */
-.modal-sm { max-width: 340px; }
+.modal-sm { max-width: 21.25rem; }
 
 .listen {
   padding: var(--s6) var(--s4) var(--s5);
@@ -575,8 +614,8 @@ svg {
 
 .waves {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: 7rem;
+  height: 7rem;
   margin: 0 auto var(--s5);
 }
 
@@ -590,14 +629,14 @@ svg {
 }
 
 .wave-core {
-  width: 12px;
-  height: 12px;
+  width: 0.75rem;
+  height: 0.75rem;
   background: var(--accent);
 }
 
 .wave {
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border: var(--edge) solid var(--accent);
   opacity: 0;
   animation: ripple 2.4s cubic-bezier(0, .35, .5, 1) infinite;
@@ -624,7 +663,7 @@ svg {
 }
 
 .progress {
-  height: 3px;
+  height: 0.1875rem;
   margin-top: var(--s5);
   border-radius: var(--r-pill);
   background: var(--surface-hi);
@@ -689,7 +728,7 @@ svg {
 
 .field-hint {
   display: block;
-  margin-top: 6px;
+  margin-top: 0.375rem;
   font-size: var(--t-xs);
   color: var(--text-faint);
 }
@@ -783,9 +822,9 @@ svg {
 
 .notice svg {
   flex: none;
-  width: 15px;
-  height: 15px;
-  margin-top: 2px;
+  width: 0.9375rem;
+  height: 0.9375rem;
+  margin-top: 0.125rem;
   color: var(--warn);
 }
 
@@ -795,7 +834,7 @@ svg {
   left: 50%;
   bottom: calc(var(--s6) + env(safe-area-inset-bottom));
   z-index: 60;
-  transform: translate(-50%, 8px);
+  transform: translate(-50%, 0.5rem);
   max-width: calc(100vw - var(--s7));
   padding: var(--s2) var(--s4);
   border: var(--edge) solid var(--border-hi);

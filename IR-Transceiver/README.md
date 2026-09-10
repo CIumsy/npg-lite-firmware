@@ -168,4 +168,4 @@ a much smaller stack than the IR and filesystem code needs.
 
 Making neuroscience affordable and accessible for everyone
 
-**[Upside Down Labs](https://upsidedownlabs.in)**
+[Upside Down Labs](https://upsidedownlabs.in)
