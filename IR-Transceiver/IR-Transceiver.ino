@@ -25,7 +25,8 @@
 
 // ESP32 based IR Controller using an Adafruit IR Transceiver on two GPIO lines
 // Hold the user button to record an IR signal, short press to fire the active one.
-// Names and the active slot live in NVS. Captured waveforms live in LittleFS.
+// Command names live in NVS, captured waveforms in LittleFS. The active slot
+// is a selection, not a setting, so it stays in RAM and is never written.
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -71,7 +72,6 @@
 #define TRIGGER_SETTLE     300   // ignore triggers after a reset, filters are ringing
 #define STALL_GAP_MS       25    // a service gap longer than this means we were blocked
 
-#define ACTIVE_SAVE_DELAY  2000  // persist the active slot once scrolling stops
 #define SAMPLE_BLOCK_COUNT 10    // samples per channel per DMA frame
 #define BATTERY_PIN        6     // battery divider sits on ADC1 channel 6 (A6)
 
@@ -249,12 +249,15 @@ void bleNotify(const uint8_t* buf, size_t len) {
 
 void bleNotify1(uint8_t op) { bleNotify(&op, 1); }
 
+static void nvsKey(char* out, size_t len, int id) {
+  snprintf(out, len, "n%d", id);
+}
+
 void nvsLoad() {
   prefs.begin(NVS_NAMESPACE, true);
-  activeId = prefs.getInt("act", -1);
   for (int i = 0; i < MAX_COMMANDS; i++) {
     char key[8];
-    snprintf(key, sizeof(key), "n%d", i);
+    nvsKey(key, sizeof(key), i);
     cmds[i].exists = prefs.isKey(key);
     if (cmds[i].exists) {
       String s = prefs.getString(key, "");
@@ -265,18 +268,30 @@ void nvsLoad() {
     }
   }
   prefs.end();
-  if (activeId >= 0 && (activeId >= MAX_COMMANDS || !cmds[activeId].exists)) activeId = -1;
+
+  // The active slot is a selection, not a setting. Scrolling changes it
+  // constantly, so it lives in RAM and never reaches flash. On boot start at
+  // the first saved command so the button always has something to fire.
+  activeId = -1;
+  for (int i = 0; i < MAX_COMMANDS; i++) {
+    if (cmds[i].exists) { activeId = i; break; }
+  }
 }
 
-void nvsSave() {
+// One slot at a time. Renaming one command must not rewrite fifty keys.
+void nvsSaveName(int id) {
+  char key[8];
+  nvsKey(key, sizeof(key), id);
   prefs.begin(NVS_NAMESPACE, false);
-  prefs.putInt("act", activeId);
-  for (int i = 0; i < MAX_COMMANDS; i++) {
-    char key[8];
-    snprintf(key, sizeof(key), "n%d", i);
-    if (cmds[i].exists) prefs.putString(key, cmds[i].name);
-    else                prefs.remove(key);
-  }
+  prefs.putString(key, cmds[id].name);
+  prefs.end();
+}
+
+void nvsRemoveName(int id) {
+  char key[8];
+  nvsKey(key, sizeof(key), id);
+  prefs.begin(NVS_NAMESPACE, false);
+  prefs.remove(key);
   prefs.end();
 }
 
@@ -624,7 +639,6 @@ class WriteCB : public BLECharacteristicCallbacks {
         int id = d[1];
         if (id < 0 || id >= MAX_COMMANDS || !cmds[id].exists) return;
         activeId = id;
-        nvsSave();
         uint8_t buf[2] = { EV_ACTIVE, (uint8_t)id };
         bleNotify(buf, 2);
         return;
@@ -638,7 +652,7 @@ class WriteCB : public BLECharacteristicCallbacks {
         cmds[id].name[0] = '\0';
         deleteIR(id);
         if (activeId == id) activeId = -1;
-        nvsSave();
+        nvsRemoveName(id);
         uint8_t buf[2] = { EV_DELETED, (uint8_t)id };
         bleNotify(buf, 2);
         return;
@@ -649,7 +663,7 @@ class WriteCB : public BLECharacteristicCallbacks {
         int id = d[1];
         if (id < 0 || id >= MAX_COMMANDS || !cmds[id].exists) return;
         copyName(id, &d[2], n - 2);
-        nvsSave();
+        nvsSaveName(id);
         notifySaved(id);
         return;
       }
@@ -670,7 +684,7 @@ class WriteCB : public BLECharacteristicCallbacks {
         copyName(id, &d[1], n - 1);
         cmds[id].exists = true;
         if (activeId < 0) activeId = id;
-        nvsSave();
+        nvsSaveName(id);
         notifySaved(id);
         pendingValid = false;
         return;
@@ -692,7 +706,7 @@ class WriteCB : public BLECharacteristicCallbacks {
         if (!saveIR(id, &pendingResult)) { bleNotify1(EV_FAIL); return; }
         copyName(id, &d[2], n - 2);
         cmds[id].exists = true;
-        nvsSave();
+        nvsSaveName(id);
         notifySaved(id);
         pendingValid = false;
         return;
@@ -757,7 +771,6 @@ static int8_t adcChannelIndex[SOC_ADC_CHANNEL_NUM(0)];
 
 static uint32_t lastServiceMs = 0;
 static uint32_t settleUntil = 0;
-static uint32_t activeSaveAt  = 0;
 
 static uint32_t battWinSum   = 0;
 static uint16_t battWinCount = 0;
@@ -858,8 +871,6 @@ static void stepCommand(int dir) {
   if (next < 0 || next == activeId) return;
 
   activeId = next;
-  // scrolling must not write flash on every twitch, so persist once it stops
-  activeSaveAt = millis();
 
   uint8_t buf[2] = { EV_ACTIVE, (uint8_t)activeId };
   bleNotify(buf, 2);
@@ -1016,11 +1027,6 @@ void loop() {
 
 #if BIOAMP_ENABLED
   bioampService();
-  // the active slot moves on every EMG step, so persist only once it settles
-  if (activeSaveAt && (now - activeSaveAt) >= ACTIVE_SAVE_DELAY) {
-    activeSaveAt = 0;
-    nvsSave();
-  }
 #else
   if (now - lastBatterySample >= BATTERY_SAMPLE_MS) {
     lastBatterySample = now;

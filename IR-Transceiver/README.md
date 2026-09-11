@@ -190,11 +190,17 @@ Each command is split across two stores on the board.
 
 | Store | Holds | Capacity |
 | --- | --- | --- |
-| NVS | names, active slot | 20 KB, roughly 250 names |
+| NVS | command names | 20 KB, roughly 250 names |
 | LittleFS | captured waveforms | 1 MB, roughly 250 signals |
 
 A slot counts as used purely because a name key exists in NVS, so NVS is the index and
-LittleFS is the payload. The build caps this at 50 commands of 16 characters via
+LittleFS is the payload.
+
+The active slot is deliberately not stored. It changes on every scroll, and
+flash is the wrong place for something that moves that often, so it lives in
+RAM and resets to the first saved command on boot. Nothing else in the firmware
+changes frequently: names and waveforms are only written when you save, rename
+or delete, and each of those touches a single key rather than rewriting the set. The build caps this at 50 commands of 16 characters via
 `MAX_COMMANDS` and `MAX_NAME_LEN`. Raising `MAX_COMMANDS` is safe up to 255, which is
 where the single-byte slot id in the protocol runs out.
 
