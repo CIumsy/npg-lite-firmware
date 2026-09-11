@@ -8,6 +8,7 @@
     dot:       $('dot'),
     status:    $('status'),
     conn:      $('btn-conn'),
+    connTxt:   $('conn-txt'),
     refresh:   $('btn-refresh'),
     theme:     $('btn-theme'),
     info:      $('btn-info'),
@@ -86,21 +87,6 @@
     $(id).classList.remove('show');
   }
 
-  function icon(paths) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 16 16');
-    svg.setAttribute('aria-hidden', 'true');
-    paths.forEach(d => {
-      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      p.setAttribute('d', d);
-      svg.appendChild(p);
-    });
-    return svg;
-  }
-
-  const PENCIL = ['M11 2.5l2.5 2.5L6 12.5 3 13l.5-3z'];
-  const TRASH  = ['M2.5 4h11', 'M5.5 4V2.5h5V4', 'M4 4l.6 9h6.8L12 4', 'M6.5 6.5v4M9.5 6.5v4'];
-
   /* rendering ------------------------------------------------ */
 
   function render() {
@@ -148,13 +134,13 @@
     edit.className = 'icon-btn icon-btn-sm';
     edit.title = 'Rename';
     edit.setAttribute('aria-label', `Rename ${cmd.name}`);
-    edit.appendChild(icon(PENCIL));
+    edit.appendChild(Icons.svg('pencil'));
 
     const del = document.createElement('button');
     del.className = 'icon-btn icon-btn-sm danger';
     del.title = 'Delete';
     del.setAttribute('aria-label', `Delete ${cmd.name}`);
-    del.appendChild(icon(TRASH));
+    del.appendChild(Icons.svg('trash'));
 
     edit.addEventListener('click', e => { e.stopPropagation(); openRename(id); });
     del.addEventListener('click',  e => { e.stopPropagation(); confirmDelete(id); });
@@ -197,7 +183,7 @@
 
   function setConnectedUI(connected, deviceName) {
     el.dot.classList.toggle('live', connected);
-    el.conn.textContent = connected ? 'Disconnect' : 'Connect';
+    el.connTxt.textContent = connected ? 'Disconnect' : 'Connect';
     el.refresh.disabled = !connected;
     el.wipe.disabled = !connected;
     if (connected) setStatus(deviceName);
@@ -328,7 +314,7 @@
     if (data.isDuplicate) {
       const notice = document.createElement('div');
       notice.className = 'notice';
-      notice.appendChild(icon(['M8 1.5L15 14H1z', 'M8 6.5v3', 'M8 11.5h.01']));
+      notice.appendChild(Icons.svg('triangle-alert'));
       const text = document.createElement('span');
       text.textContent = `This matches "${dupName}". Save it as a new command or replace the existing one.`;
       notice.appendChild(text);
@@ -575,12 +561,14 @@
 
   /* start ---------------------------------------------------- */
 
+  Icons.hydrate(document);
+
   if (!BLE.isSupported()) {
     el.conn.disabled = true;
     setStatus('Web Bluetooth not supported');
     const notice = document.createElement('div');
     notice.className = 'notice';
-    notice.appendChild(icon(['M8 1.5L15 14H1z', 'M8 6.5v3', 'M8 11.5h.01']));
+    notice.appendChild(Icons.svg('triangle-alert'));
     const text = document.createElement('span');
     text.textContent = 'This browser cannot talk to Bluetooth devices. Open this page in Chrome or Edge.';
     notice.appendChild(text);

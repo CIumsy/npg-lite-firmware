@@ -149,13 +149,19 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Lucide icons. They are drawn on a 24 unit grid at stroke width 2, so the
+   weight holds at whatever size a rule below gives them. Block display keeps
+   the wrapper span from adding a baseline gap under the icon. */
 svg {
+  display: block;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+.ico { display: inline-flex; }
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -387,7 +393,7 @@ svg {
 .empty svg {
   width: 1.75rem;
   height: 1.75rem;
-  stroke-width: 1.25;
+  stroke-width: 1.75;
 }
 
 .empty p {

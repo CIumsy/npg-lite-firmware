@@ -178,11 +178,18 @@ index.html           markup
 css/style.css        design tokens and all styling
 js/ble.js            Bluetooth transport and wire protocol
 js/app.js            UI and state
-assets/              UDL logo, black for light theme and white for dark
+js/icons.js          the icon set
+assets/              UDL logo, black for light theme and white for dark, and the icon originals
 ```
 
 `ble.js` never touches the DOM and `app.js` never touches Bluetooth. To change the
 protocol, only `ble.js` and the firmware need to agree.
+
+The icons are [Lucide](https://lucide.dev). Each one is an SVG file in `assets/`, and
+its inner markup is copied into `icons.js` so the icon can inherit colour from the
+theme, which an `<img>` cannot do. Markup writes `<span class="ico" data-icon="name">`
+and `icons.js` fills it in. To add an icon, download it from lucide.dev into `assets/`
+and paste its inner markup into `icons.js` under the same name.
 
 ## Storage
 
