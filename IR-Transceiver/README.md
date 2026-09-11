@@ -67,38 +67,31 @@ board or the app. Everything is configured by macros at the top of the sketch,
 and all signal processing stays on the firmware. The app only receives the
 resulting selection and fire events.
 
-Set `BCI_ENABLED` to 0 for a plain IR remote. Leave it on only with electrodes
-attached, because a floating input drifts and will trigger by itself.
+Set `BIOAMP_ENABLED` to false for a plain IR remote. Leave it on only with
+electrodes attached, because a floating input drifts and will trigger by itself.
 
-`BCI_CHANNEL_LIST` names the pads to sample, in ascending order. A0 is 0 and A5
-is 5, and the set does not have to be contiguous, so `{ 0, 3 }` is valid.
+`BIOAMP_CHANNELS` names the pads to sample, in ascending order. A0 is 0 and A5
+is 5, and the set does not have to be contiguous, so `{ 0, 3 }` is valid. The
+first entry drives the triggers.
 
-Two modes, chosen with `BCI_MODE`.
-
-| Mode | Channels | Controls |
-| --- | --- | --- |
-| `BCI_MODE_EMG` | two | first steps back, second steps forward, both together fire |
-| `BCI_MODE_EEGEMG` | one | clench taps and holds scroll, sustained focus fires |
-
-In the single channel mode one muscle covers both directions.
+One muscle covers both scroll directions.
 
 | Gesture | Action |
 | --- | --- |
 | Short clench | steps up one slot |
-| Clench held past `BCI_HOLD_MS` | scrolls down, repeating every `BCI_REPEAT_MS` |
+| Clench held past `JAW_HOLD_MS` | scrolls down, repeating every `JAW_REPEAT_MS` |
 | Sustained focus | fires the active command |
 
 A tap can only be distinguished from a hold once the muscle relaxes, so the
 upward step lands on release rather than on contraction.
 
-In the single channel mode the signal is notched once and then split. One path
-is high passed and enveloped for the clench. The other is low passed and run
-through an FFT, and focus is the beta share of total power crossing
-`FOCUS_THRESHOLD`. A clench floods the EEG band, so focus is ignored for
-`JAW_BLOCK_MS` around one.
+The signal is notched once and then split. One path is high passed and
+enveloped for the clench. The other is low passed and run through an FFT, and
+focus is the beta share of total power crossing `FOCUS_THRESHOLD`. A clench
+floods the EEG band, so focus is ignored for `JAW_BLOCK_MS` around one.
 
-Thresholds worth calibrating are `EMG_THRESHOLD` with its `EMG_RELEASE`
-hysteresis, and `FOCUS_THRESHOLD`. `BCI_NOTCH_HZ` is 50 or 60 and nothing else,
+Thresholds worth calibrating are `JAW_THRESHOLD` with its `JAW_RELEASE`
+hysteresis, and `FOCUS_THRESHOLD`. `NOTCH_HZ` is 50 or 60 and nothing else,
 which the build enforces.
 
 Sampling runs through the ADC in continuous DMA mode, so sample timing never
