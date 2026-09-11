@@ -41,20 +41,11 @@
 #include <IRutils.h>
 #include <Adafruit_NeoPixel.h>
 
-// ---------------------------------------------------------------------------
-// Bioamp control
-//
-// One electrode channel drives the command list. A short jaw clench steps up,
-// a held clench scrolls down, and sustained focus fires. Set BIOAMP_ENABLED to
-// false for a plain IR remote, which is what you want when no electrodes are
-// attached, because a floating input drifts and will trigger on its own.
-// ---------------------------------------------------------------------------
-#define BIOAMP_ENABLED     true  // false = plain IR remote, no sampling at all
 
-// Which bioamp pads to sample, in ascending order. A0 is 0, A5 is 5. Any
-// subset works, they do not have to be next to each other. The first entry
-// is the one that drives the triggers.
-#define BIOAMP_CHANNELS    { 0 }
+
+
+#define BIOAMP_ENABLED     true  // false = plain IR remote, no bio-potential data sampling at all
+#define BIOAMP_CHANNELS    { 0 } // what channels to sample
 
 #define NOTCH_HZ           50    // mains notch, 50 or 60 only
 #define SAMPLE_RATE        500   // per channel, must match the filter design
@@ -749,14 +740,18 @@ static adc_continuous_handle_t adcHandle = nullptr;
 static SemaphoreHandle_t       adcSem    = nullptr;
 static bool                    bioampReady  = false;
 
-// Every channel is notched first, then split. The EMG path is high passed and
-// enveloped. In EEGEMG mode the same notched signal also feeds a low passed
-// EEG path whose spectrum gives the beta share used for focus.
+// Mains notch is the only thing applied to every channel, because it is always
+// wanted. Each channel's latest notched sample is parked in notched[] and
+// anything further is per channel and left to you. See the sample loop.
 static NotchFilter notchFilter[CHANNEL_COUNT];
-static EMGFilter   emgFilter[CHANNEL_COUNT];
-static Envelope    envelope[CHANNEL_COUNT];
-static int         envValue[CHANNEL_COUNT];
+static float       notched[CHANNEL_COUNT];
 
+// Channel 0 is the one wired to the triggers. Its notched signal is split two
+// ways: high passed and enveloped for the jaw clench, and low passed into a
+// spectrum for the beta share that detects focus.
+static EMGFilter   emgFilter;
+static Envelope    envelope;
+static int         jawLevel = 0;
 static EEGFilter   eegFilter;
 static BetaPower   betaPower;
 static bool        jawHeld      = false;
@@ -845,10 +840,11 @@ static void bioampReset() {
   }
   for (int i = 0; i < CHANNEL_COUNT; i++) {
     notchFilter[i].reset();
-    emgFilter[i].reset();
-    envelope[i].reset();
-    envValue[i] = 0;
+    notched[i] = 0.0f;
   }
+  emgFilter.reset();
+  envelope.reset();
+  jawLevel = 0;
   eegFilter.reset();
   betaPower.reset();
   jawHeld      = false;
@@ -886,7 +882,7 @@ static void stepCommand(int dir) {
 // step happens on release. A clench also floods the EEG band, which is why
 // focus is ignored while one is in progress and for a moment afterwards.
 static void evaluateTriggers(uint32_t now) {
-  int level = envValue[0];
+  int level = jawLevel;
 
   if (!jawHeld) {
     if (level > JAW_THRESHOLD && (now - lastJawMs) >= TRIGGER_DEBOUNCE) {
@@ -941,14 +937,18 @@ void bioampService() {
         battWinSum += p->type2.data;
         battWinCount++;
       } else {
-        // each channel keeps its own filter and envelope state
-        float notched = notchFilter[idx].process(fixRaw(p->type2.data));
+        // notch every channel, each with its own filter state
+        notched[idx] = notchFilter[idx].process(fixRaw(p->type2.data));
 
-        float muscle = emgFilter[idx].process(notched);
-        envValue[idx] = envelope[idx].process(abs((int)muscle));
+        if (idx == 0) {
+          float muscle = emgFilter.process(notched[0]);
+          jawLevel = envelope.process(abs((int)muscle));
+          betaPower.push(eegFilter.process(notched[0]));
+        }
 
-        // the same notched sample, low passed and fed to the spectrum
-        if (idx == 0) betaPower.push(eegFilter.process(notched));
+        // Adding a channel? Its notched sample is ready in notched[idx] right
+        // here. Declare your own filter and envelope for it above, process it
+        // in this block, then act on the result in evaluateTriggers().
       }
     }
   }
