@@ -57,6 +57,7 @@
 #define HOLD_THRESHOLD  1500
 #define DEBOUNCE_MS     200
 #define LIST_DELAY_MS   1000
+#define LIST_PACE_MS    15     // one list entry per connection interval
 #define RECORD_TIMEOUT  15000
 
 // Limits
@@ -160,16 +161,22 @@ uint32_t connectedAt = 0;
 
 // Work deferred out of the BLE callback so IR and filesystem access
 // stay on the main task, which has a much larger stack.
+// Command list streaming. -1 means idle, otherwise the next slot to look at.
+int      listCursor   = -1;
+uint32_t lastListSend = 0;
+
 volatile bool reqList   = false;
 volatile bool reqWipe   = false;
 volatile bool reqCancel = false;
 volatile int  reqFire   = -1;
 
+// Sends one notification and returns. The stack queues a handful of packets,
+// so isolated events are safe to fire back to back. Only a long run needs
+// pacing, and the command list is the one place that happens. See serviceList.
 void bleNotify(const uint8_t* buf, size_t len) {
   if (!bleConnected || !pNotify) return;
   pNotify->setValue((uint8_t*)buf, len);
   pNotify->notify();
-  delay(15);
 }
 
 void bleNotify1(uint8_t op) { bleNotify(&op, 1); }
@@ -340,19 +347,39 @@ void wipeAll() {
   Serial.println("[CMD] wiped all commands");
 }
 
-void sendList() {
-  for (int i = 0; i < MAX_COMMANDS; i++) {
-    if (!cmds[i].exists) continue;
-    uint8_t buf[4 + MAX_NAME_LEN];
-    uint8_t nlen = strlen(cmds[i].name);
-    buf[0] = EV_LIST_ENTRY;
-    buf[1] = (uint8_t)i;
-    buf[2] = (i == activeId) ? 1 : 0;
-    buf[3] = nlen;
-    memcpy(&buf[4], cmds[i].name, nlen);
-    bleNotify(buf, 4 + nlen);
+// The list is the only burst of notifications this firmware sends. Pushing it
+// faster than the connection interval overflows the stack queue and entries go
+// missing, so it is paced. Pacing with delay() would stall loop() for most of a
+// second on a full list, so it walks one entry per call instead.
+void startList() {
+  listCursor   = 0;
+  lastListSend = millis() - LIST_PACE_MS;   // let the first entry go at once
+}
+
+void serviceList(uint32_t now) {
+  if (listCursor < 0) return;
+  if (!bleConnected) { listCursor = -1; return; }
+  if (now - lastListSend < LIST_PACE_MS) return;
+
+  while (listCursor < MAX_COMMANDS && !cmds[listCursor].exists) listCursor++;
+
+  if (listCursor >= MAX_COMMANDS) {
+    bleNotify1(EV_LIST_END);
+    listCursor = -1;
+    return;
   }
-  bleNotify1(EV_LIST_END);
+
+  uint8_t buf[4 + MAX_NAME_LEN];
+  uint8_t nlen = strlen(cmds[listCursor].name);
+  buf[0] = EV_LIST_ENTRY;
+  buf[1] = (uint8_t)listCursor;
+  buf[2] = (listCursor == activeId) ? 1 : 0;
+  buf[3] = nlen;
+  memcpy(&buf[4], cmds[listCursor].name, nlen);
+  bleNotify(buf, 4 + nlen);
+
+  lastListSend = now;
+  listCursor++;
 }
 
 void notifyCapture(int dupId) {
@@ -684,8 +711,9 @@ void loop() {
   }
   if (reqList && bleConnected && (now - connectedAt) >= LIST_DELAY_MS) {
     reqList = false;
-    sendList();
+    startList();
   }
+  serviceList(now);
 
   bool btnLow = (digitalRead(USER_BTN_PIN) == LOW);
 
