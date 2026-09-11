@@ -78,7 +78,18 @@ Two modes, chosen with `BCI_MODE`.
 | Mode | Channels | Controls |
 | --- | --- | --- |
 | `BCI_MODE_EMG` | two | first steps back, second steps forward, both together fire |
-| `BCI_MODE_EEGEMG` | one | jaw clench steps forward, sustained focus fires |
+| `BCI_MODE_EEGEMG` | one | clench taps and holds scroll, sustained focus fires |
+
+In the single channel mode one muscle covers both directions.
+
+| Gesture | Action |
+| --- | --- |
+| Short clench | steps up one slot |
+| Clench held past `BCI_HOLD_MS` | scrolls down, repeating every `BCI_REPEAT_MS` |
+| Sustained focus | fires the active command |
+
+A tap can only be distinguished from a hold once the muscle relaxes, so the
+upward step lands on release rather than on contraction.
 
 In the single channel mode the signal is notched once and then split. One path
 is high passed and enveloped for the clench. The other is low passed and run

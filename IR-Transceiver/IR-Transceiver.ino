@@ -69,6 +69,8 @@
 #define FOCUS_THRESHOLD    10.0f // beta share of total EEG power, percent
 #define FOCUS_DEBOUNCE_MS  2000  // ignore further focus triggers for this long
 #define JAW_BLOCK_MS       500   // a clench swamps the EEG, so ignore focus around it
+#define BCI_HOLD_MS        600   // a clench held this long starts scrolling down
+#define BCI_REPEAT_MS      300   // scroll cadence while held, matches a fast tap
 
 #define BCI_DECISION_MS    120   // wait this long to see if the other channel joins
 #define BCI_DEBOUNCE_MS    300   // ignore new triggers for this long after one lands
@@ -756,9 +758,12 @@ static int         envValue[BCI_CHANNELS];
 #if BCI_MODE == BCI_MODE_EEGEMG
 static EEGFilter   eegFilter;
 static BetaPower   betaPower;
-static bool        jawHeld     = false;
-static uint32_t    lastJawMs   = 0;
-static uint32_t    lastFocusMs = 0;
+static bool        jawHeld      = false;
+static bool        jawScrolling = false;
+static uint32_t    jawStartMs   = 0;
+static uint32_t    lastRepeatMs = 0;
+static uint32_t    lastJawMs    = 0;
+static uint32_t    lastFocusMs  = 0;
 #endif
 
 // maps a physical ADC channel back to its slot in the pattern
@@ -855,7 +860,8 @@ static void bciReset() {
 #if BCI_MODE == BCI_MODE_EEGEMG
   eegFilter.reset();
   betaPower.reset();
-  jawHeld = false;
+  jawHeld      = false;
+  jawScrolling = false;
 #else
   bciPhase      = BCI_IDLE;
   bciWindowMask = 0;
@@ -901,22 +907,36 @@ static void bciDispatch(uint8_t mask) {
 }
 
 #if BCI_MODE == BCI_MODE_EEGEMG
-// One channel, two jobs. A jaw clench is a large short burst in the EMG band
-// and steps the selection. Sustained focus raises the beta share and fires.
-// A clench also floods the EEG band, so focus is ignored around one.
+// One channel, three gestures.
+//   tap    a short clench steps up one slot
+//   hold   a sustained clench scrolls down, repeating at the tap cadence
+//   focus  sustained beta fires the active command
+//
+// A tap can only be told apart from a hold once the muscle relaxes, so the
+// step happens on release. A clench also floods the EEG band, which is why
+// focus is ignored while one is in progress and for a moment afterwards.
 static void bciEvaluate(uint32_t now) {
-  int  level = envValue[0];
+  int level = envValue[0];
 
   if (!jawHeld) {
     if (level > EMG_THRESHOLD && (now - lastJawMs) >= BCI_DEBOUNCE_MS) {
-      jawHeld   = true;
-      lastJawMs = now;
-      bciStep(+1);
+      jawHeld      = true;
+      jawScrolling = false;
+      jawStartMs   = now;
     }
   } else if (level < EMG_RELEASE) {
     // hysteresis, the muscle has to relax before the next clench counts
     jawHeld   = false;
     lastJawMs = now;
+    if (!jawScrolling) bciStep(-1);    // it was a tap, so step up
+    jawScrolling = false;
+  } else if (!jawScrolling && (now - jawStartMs) >= BCI_HOLD_MS) {
+    jawScrolling = true;               // held long enough, start scrolling down
+    lastRepeatMs = now;
+    bciStep(+1);
+  } else if (jawScrolling && (now - lastRepeatMs) >= BCI_REPEAT_MS) {
+    lastRepeatMs = now;
+    bciStep(+1);
   }
 
   bool jawNoise = jawHeld || (now - lastJawMs) < JAW_BLOCK_MS;
