@@ -131,6 +131,7 @@
 
     const li = document.createElement('li');
     li.className = 'row' + (id === activeId ? ' active' : '');
+    li.dataset.id = id;
     li.tabIndex = 0;
 
     const radio = document.createElement('span');
@@ -167,6 +168,31 @@
     actions.append(edit, del);
     li.append(radio, name, actions);
     return li;
+  }
+
+  /* muscle trigger feedback ---------------------------------- */
+
+  // render() rebuilds the list, so any animation class has to be applied
+  // after it, looked up by slot rather than by position.
+  function flashRow(id, className, ms) {
+    const row = el.list.querySelector(`[data-id="${id}"]`);
+    if (!row) return null;
+    row.classList.remove(className);
+    void row.offsetWidth;              // restart the animation if it is replayed
+    row.classList.add(className);
+    setTimeout(() => row.classList.remove(className), ms);
+    return row;
+  }
+
+  function showStep(id) {
+    const row = flashRow(id, 'stepped', 320);
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function showFire(id) {
+    flashRow(id, 'fired', 480);
+    el.fire.classList.add('firing');
+    setTimeout(() => el.fire.classList.remove('firing'), 480);
   }
 
   function setConnectedUI(connected, deviceName) {
@@ -413,10 +439,12 @@
     toast('Command deleted');
   });
 
+  // also arrives when a muscle trigger steps the selection on the board
   BLE.on('active', id => {
     activeId = id;
     loading = false;
     render();
+    showStep(id);
   });
 
   BLE.on('wiped', () => {
@@ -429,6 +457,7 @@
 
   BLE.on('fired', () => {
     const cmd = commands.get(activeId);
+    showFire(activeId);
     toast(cmd ? `Sent "${cmd.name}"` : 'Sent');
   });
 

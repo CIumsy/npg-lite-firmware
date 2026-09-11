@@ -339,6 +339,37 @@ svg {
   .row-actions { opacity: 1; }
 }
 
+/* muscle trigger feedback ------------------------------------
+   The board drives these. A step marks the row the selection moved
+   to, a fire flashes the row and the button together. */
+.row.stepped {
+  animation: row-step 320ms ease-out;
+}
+
+@keyframes row-step {
+  from { box-shadow: inset 0.1875rem 0 0 var(--accent); }
+  to   { box-shadow: inset 0.1875rem 0 0 transparent; }
+}
+
+.row.fired {
+  animation: row-fire 480ms ease-out;
+}
+
+@keyframes row-fire {
+  from { background: var(--accent); }
+  to   { background: transparent; }
+}
+
+.btn-fire.firing {
+  animation: fire-pulse 480ms ease-out;
+}
+
+@keyframes fire-pulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
 /* empty state ----------------------------------------------- */
 .empty {
   display: none;
@@ -862,6 +893,8 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
+  /* the trigger feedback is decorative, the highlight already moved */
+  .row.stepped, .row.fired, .btn-fire.firing { animation: none; }
   /* keep the rings as a static halo rather than pulsing */
   .wave { animation: none; opacity: .25; transform: translate(-50%, -50%) scale(2.6); }
   .wave:nth-child(2) { transform: translate(-50%, -50%) scale(4); }

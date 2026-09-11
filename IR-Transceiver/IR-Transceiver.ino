@@ -40,6 +40,84 @@
 #include <IRutils.h>
 #include <Adafruit_NeoPixel.h>
 
+// ---------------------------------------------------------------------------
+// Muscle and brain control
+//
+// Two modes, picked by BCI_MODE below. Set BCI_ENABLED to 0 to build a plain
+// IR remote, which is what you want when no electrodes are attached, because
+// a floating input drifts and will trigger on its own.
+// ---------------------------------------------------------------------------
+#define BCI_ENABLED        1     // 0 = plain IR remote, no sampling at all
+
+// Which bioamp pads to sample, in ascending order. A0 is 0, A5 is 5. Any
+// subset works, they do not have to be next to each other.
+#define BCI_CHANNEL_LIST   { 0 }
+
+// EMG    two muscle channels. The first steps back, the second steps forward,
+//        both together fire the active command.
+// EEGEMG one channel doing both jobs. A jaw clench steps forward, sustained
+//        focus fires. Uses the first channel in the list.
+#define BCI_MODE_EMG       0
+#define BCI_MODE_EEGEMG    1
+#define BCI_MODE           BCI_MODE_EEGEMG
+
+#define BCI_NOTCH_HZ       50    // mains notch, 50 or 60 only
+#define BCI_SAMPLE_RATE    500   // per channel, must match the filter design
+
+#define EMG_THRESHOLD      75    // envelope level that starts a contraction
+#define EMG_RELEASE        60    // must fall below this before the next one counts
+#define FOCUS_THRESHOLD    10.0f // beta share of total EEG power, percent
+#define FOCUS_DEBOUNCE_MS  2000  // ignore further focus triggers for this long
+#define JAW_BLOCK_MS       500   // a clench swamps the EEG, so ignore focus around it
+
+#define BCI_DECISION_MS    120   // wait this long to see if the other channel joins
+#define BCI_DEBOUNCE_MS    300   // ignore new triggers for this long after one lands
+#define BCI_SETTLE_MS      300   // ignore triggers after a reset, filters are ringing
+#define BCI_GAP_MS         25    // a service gap longer than this means we were blocked
+#define BCI_SAVE_DELAY_MS  2000  // persist the active slot once scrolling stops
+#define BCI_BLOCK          10    // samples per channel per DMA frame
+#define BATTERY_ADC_CH     6     // battery divider sits on ADC1 channel 6 (A6)
+
+#if BCI_ENABLED
+  #include "freertos/FreeRTOS.h"
+  #include "freertos/semphr.h"
+  #include "esp_adc/adc_continuous.h"
+  #include "hal/adc_types.h"
+  #include "hal/efuse_hal.h"
+  #include "soc/soc_caps.h"
+  #include "Filters/EMGFilter.h"
+  #include "Filters/Envelope.h"
+
+  static const uint8_t bciChannel[] = BCI_CHANNEL_LIST;
+  #define BCI_CHANNELS (sizeof(bciChannel) / sizeof(bciChannel[0]))
+
+  // sizeof is invisible to the preprocessor, so these are runtime-typed
+  // constant checks rather than #error
+  static_assert(BCI_CHANNELS >= 1 && BCI_CHANNELS <= 6,
+                "BCI_CHANNEL_LIST must name between 1 and 6 channels");
+  #if BCI_MODE == BCI_MODE_EMG
+    static_assert(BCI_CHANNELS >= 2,
+                  "BCI_MODE_EMG needs two channels, add one to BCI_CHANNEL_LIST");
+  #endif
+
+  #if BCI_MODE == BCI_MODE_EEGEMG
+    #include "Filters/EEGFilter.h"
+    #include "Filters/BetaPower.h"
+  #endif
+
+  // Only two mains frequencies exist, so reject anything else at compile time
+  // rather than silently running an unfiltered signal.
+  #if BCI_NOTCH_HZ == 50
+    #include "Filters/Notch50.h"
+    typedef Notch50 NotchFilter;
+  #elif BCI_NOTCH_HZ == 60
+    #include "Filters/Notch60.h"
+    typedef Notch60 NotchFilter;
+  #else
+    #error "BCI_NOTCH_HZ must be 50 or 60"
+  #endif
+#endif
+
 // Pins
 #define IR_RECV_PIN     23
 #define IR_SEND_PIN     22
@@ -421,12 +499,30 @@ float interpolatePercentage(float voltage) {
   return p1 + (voltage - v1) * (p2 - p1) / (v2 - v1);
 }
 
-int getCurrentBatteryPercentage() {
-  // the divide below expects millivolts, so the fallback reads them too
-  float avgRaw = (batteryWinCount > 0) ? (batteryWinSum / batteryWinCount)
-                                       : analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
+#if BCI_ENABLED
+uint16_t bciBatteryMillivolts();   // defined with the sampling code below
+#endif
+
+// Averaged reading for the battery divider. With EMG enabled the continuous
+// driver owns ADC1, so the value arrives through the DMA pattern instead of a
+// one shot read. On the C6 a raw count is close enough to a millivolt for the
+// curve below, which is how the other NPG Lite firmware handles it too.
+static float batteryReading() {
+#if BCI_ENABLED
+  uint16_t avg = bciBatteryMillivolts();
+  return (avg > 0) ? (float)avg : 0.0f;
+#else
+  float avg = (batteryWinCount > 0) ? (batteryWinSum / batteryWinCount)
+                                    : analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
   batteryWinSum = 0;
   batteryWinCount = 0;
+  return avg;
+#endif
+}
+
+int getCurrentBatteryPercentage() {
+  float avgRaw = batteryReading();
+  if (avgRaw <= 0.0f) return (lastBatteryPct < 0) ? 100 : lastBatteryPct;
   float voltage = (avgRaw / 1000.0) * 2;
   voltage += 0.022;
   float percentage = interpolatePercentage(voltage);
@@ -629,6 +725,296 @@ class WriteCB : public BLECharacteristicCallbacks {
   }
 };
 
+#if BCI_ENABLED
+// ===========================================================================
+// EMG sampling and triggers
+//
+// The ADC runs in continuous DMA mode, so samples are taken by hardware and
+// never jitter, no matter what loop() is doing. Everything else in this
+// firmware blocks at some point: flash writes, IR transmission, the list
+// stream. Rather than try to keep filtering through those, bciService spots
+// the gap, throws away what DMA collected, and resets the filters. That keeps
+// the signal honest at the cost of a short blind window.
+// ===========================================================================
+
+#define ADC_PATTERN_LEN  (BCI_CHANNELS + 1)   // bioamp channels plus battery
+#define ADC_BATTERY_IDX  BCI_CHANNELS         // battery is last in the pattern
+#define ADC_FRAME_BYTES  (ADC_PATTERN_LEN * SOC_ADC_DIGI_RESULT_BYTES * BCI_BLOCK)
+
+static adc_continuous_handle_t adcHandle = nullptr;
+static SemaphoreHandle_t       adcSem    = nullptr;
+static bool                    bciReady  = false;
+
+// Every channel is notched first, then split. The EMG path is high passed and
+// enveloped. In EEGEMG mode the same notched signal also feeds a low passed
+// EEG path whose spectrum gives the beta share used for focus.
+static NotchFilter notchFilter[BCI_CHANNELS];
+static EMGFilter   emgFilter[BCI_CHANNELS];
+static Envelope    envelope[BCI_CHANNELS];
+static int         envValue[BCI_CHANNELS];
+
+#if BCI_MODE == BCI_MODE_EEGEMG
+static EEGFilter   eegFilter;
+static BetaPower   betaPower;
+static bool        jawHeld     = false;
+static uint32_t    lastJawMs   = 0;
+static uint32_t    lastFocusMs = 0;
+#endif
+
+// maps a physical ADC channel back to its slot in the pattern
+static int8_t adcChannelIndex[SOC_ADC_CHANNEL_NUM(0)];
+
+enum BciPhase { BCI_IDLE, BCI_DECIDING, BCI_LOCKED };
+static BciPhase bciPhase       = BCI_IDLE;
+static uint32_t bciPhaseAt     = 0;
+static uint8_t  bciWindowMask  = 0;
+static uint32_t bciLastService = 0;
+static uint32_t bciSettleUntil = 0;
+static uint32_t activeDirtyAt  = 0;
+
+static uint32_t battWinSum   = 0;
+static uint16_t battWinCount = 0;
+
+// The C6 rev1 ADC tops out below full scale, so stretch it back.
+static inline uint16_t fixRaw(uint16_t raw) {
+  static uint32_t chiprev = efuse_hal_chip_revision();
+  if (chiprev == 1) {
+    uint32_t v = (uint32_t)raw * 4095u / 3249u;
+    return (uint16_t)(v > 4095u ? 4095u : v);
+  }
+  return raw;
+}
+
+static bool IRAM_ATTR adcOnConvDone(adc_continuous_handle_t handle,
+                                    const adc_continuous_evt_data_t* edata,
+                                    void* user_data) {
+  BaseType_t woken = pdFALSE;
+  xSemaphoreGiveFromISR(adcSem, &woken);
+  return woken == pdTRUE;
+}
+
+bool bciBegin() {
+  adcSem = xSemaphoreCreateBinary();
+  if (!adcSem) return false;
+
+  static adc_digi_pattern_config_t pattern[ADC_PATTERN_LEN];
+  for (int i = 0; i < ADC_PATTERN_LEN; i++) {
+    pattern[i].atten     = ADC_ATTEN_DB_12;
+    pattern[i].channel   = (i == ADC_BATTERY_IDX) ? BATTERY_ADC_CH : bciChannel[i];
+    pattern[i].unit      = ADC_UNIT_1;
+    pattern[i].bit_width = ADC_BITWIDTH_12;
+  }
+  for (size_t i = 0; i < sizeof(adcChannelIndex); i++) adcChannelIndex[i] = -1;
+  for (int i = 0; i < ADC_PATTERN_LEN; i++) adcChannelIndex[pattern[i].channel] = i;
+
+  adc_continuous_handle_cfg_t handleCfg = {
+    .max_store_buf_size = ADC_FRAME_BYTES * 4,
+    .conv_frame_size    = ADC_FRAME_BYTES,
+  };
+  if (adc_continuous_new_handle(&handleCfg, &adcHandle) != ESP_OK) return false;
+
+  adc_continuous_evt_cbs_t cbs = { .on_conv_done = adcOnConvDone };
+  if (adc_continuous_register_event_callbacks(adcHandle, &cbs, nullptr) != ESP_OK) return false;
+
+  adc_continuous_config_t cfg = {
+    .pattern_num    = ADC_PATTERN_LEN,
+    .adc_pattern    = pattern,
+    .sample_freq_hz = (uint32_t)(BCI_SAMPLE_RATE * ADC_PATTERN_LEN),
+    .conv_mode      = ADC_CONV_SINGLE_UNIT_1,
+    .format         = ADC_DIGI_OUTPUT_FORMAT_TYPE2,
+  };
+  if (adc_continuous_config(adcHandle, &cfg) != ESP_OK) return false;
+  if (adc_continuous_start(adcHandle) != ESP_OK) return false;
+
+#if BCI_MODE == BCI_MODE_EEGEMG
+  betaPower.begin((float)BCI_SAMPLE_RATE);
+#endif
+
+  bciReady = true;
+  Serial.printf("[BCI] %d channel(s) at %d Hz, %d Hz notch, mode %s\n",
+                (int)BCI_CHANNELS, BCI_SAMPLE_RATE, BCI_NOTCH_HZ,
+                (BCI_MODE == BCI_MODE_EEGEMG) ? "EEG+EMG" : "EMG");
+  return true;
+}
+
+// Throw away buffered samples and restart the filters. Called whenever
+// something blocked us, because a gap mid-stream makes the IIR state
+// meaningless and the ringing on resume looks exactly like a contraction.
+static void bciReset() {
+  if (adcHandle) {
+    uint8_t scratch[ADC_FRAME_BYTES];
+    uint32_t got = 0;
+    while (adc_continuous_read(adcHandle, scratch, sizeof(scratch), &got, 0) == ESP_OK && got) {}
+  }
+  for (int i = 0; i < BCI_CHANNELS; i++) {
+    notchFilter[i].reset();
+    emgFilter[i].reset();
+    envelope[i].reset();
+    envValue[i] = 0;
+  }
+#if BCI_MODE == BCI_MODE_EEGEMG
+  eegFilter.reset();
+  betaPower.reset();
+  jawHeld = false;
+#else
+  bciPhase      = BCI_IDLE;
+  bciWindowMask = 0;
+#endif
+  bciSettleUntil = millis() + BCI_SETTLE_MS;
+}
+
+// next occupied slot in the given direction, wrapping, -1 if the list is empty
+static int bciNextSlot(int from, int dir) {
+  for (int k = 1; k <= MAX_COMMANDS; k++) {
+    int i = ((from + dir * k) % MAX_COMMANDS + MAX_COMMANDS) % MAX_COMMANDS;
+    if (cmds[i].exists) return i;
+  }
+  return -1;
+}
+
+static void bciStep(int dir) {
+  int from = (activeId >= 0) ? activeId : (dir > 0 ? MAX_COMMANDS - 1 : 0);
+  int next = bciNextSlot(from, dir);
+  if (next < 0 || next == activeId) return;
+
+  activeId = next;
+  // scrolling must not write flash on every twitch, so persist once it stops
+  activeDirtyAt = millis();
+
+  uint8_t buf[2] = { EV_ACTIVE, (uint8_t)activeId };
+  bleNotify(buf, 2);
+  Serial.printf("[EMG] %s -> slot %d\n", dir > 0 ? "next" : "prev", activeId);
+}
+
+static void bciDispatch(uint8_t mask) {
+  bool first  = mask & 0x01;
+  bool second = (BCI_CHANNELS > 1) && (mask & 0x02);
+
+  if (first && second) {
+    reqFire = activeId;            // reuse the normal fire path in loop()
+    Serial.println("[EMG] fire");
+  } else if (first) {
+    bciStep(-1);
+  } else if (second) {
+    bciStep(+1);
+  }
+}
+
+#if BCI_MODE == BCI_MODE_EEGEMG
+// One channel, two jobs. A jaw clench is a large short burst in the EMG band
+// and steps the selection. Sustained focus raises the beta share and fires.
+// A clench also floods the EEG band, so focus is ignored around one.
+static void bciEvaluate(uint32_t now) {
+  int  level = envValue[0];
+
+  if (!jawHeld) {
+    if (level > EMG_THRESHOLD && (now - lastJawMs) >= BCI_DEBOUNCE_MS) {
+      jawHeld   = true;
+      lastJawMs = now;
+      bciStep(+1);
+    }
+  } else if (level < EMG_RELEASE) {
+    // hysteresis, the muscle has to relax before the next clench counts
+    jawHeld   = false;
+    lastJawMs = now;
+  }
+
+  bool jawNoise = jawHeld || (now - lastJawMs) < JAW_BLOCK_MS;
+  if (!jawNoise && betaPower.value() > FOCUS_THRESHOLD &&
+      (now - lastFocusMs) >= FOCUS_DEBOUNCE_MS) {
+    lastFocusMs = now;
+    reqFire = activeId;
+    Serial.printf("[EEG] focus %.1f%% -> fire\n", betaPower.value());
+  }
+}
+
+#else
+static void bciEvaluate(uint32_t now) {
+  uint8_t mask = 0;
+  for (int i = 0; i < BCI_CHANNELS && i < 8; i++) {
+    if (envValue[i] > EMG_THRESHOLD) mask |= (1 << i);
+  }
+
+  switch (bciPhase) {
+    case BCI_IDLE:
+      if (mask) {
+        bciPhase      = BCI_DECIDING;
+        bciPhaseAt    = now;
+        bciWindowMask = mask;
+      }
+      break;
+
+    case BCI_DECIDING:
+      // collect everything that fires during the window so a two channel
+      // squeeze is not read as whichever channel happened to cross first
+      bciWindowMask |= mask;
+      if (now - bciPhaseAt >= BCI_DECISION_MS) {
+        bciDispatch(bciWindowMask);
+        bciPhase   = BCI_LOCKED;
+        bciPhaseAt = now;
+      }
+      break;
+
+    case BCI_LOCKED:
+      // require a relaxed muscle as well as the debounce, otherwise holding a
+      // contraction repeats the trigger
+      if (now - bciPhaseAt >= BCI_DEBOUNCE_MS && mask == 0) bciPhase = BCI_IDLE;
+      break;
+  }
+}
+#endif  // BCI_MODE
+
+void bciService() {
+  if (!bciReady) return;
+
+  uint32_t now = millis();
+  if (bciLastService && (now - bciLastService) > BCI_GAP_MS) bciReset();
+  bciLastService = now;
+
+  if (xSemaphoreTake(adcSem, 0) != pdTRUE) return;
+
+  uint8_t frame[ADC_FRAME_BYTES];
+  uint32_t len = 0;
+  while (adc_continuous_read(adcHandle, frame, sizeof(frame), &len, 0) == ESP_OK && len) {
+    for (uint32_t i = 0; i + SOC_ADC_DIGI_RESULT_BYTES <= len; i += SOC_ADC_DIGI_RESULT_BYTES) {
+      auto* p = (const adc_digi_output_data_t*)&frame[i];
+      uint8_t hw = p->type2.channel;
+      if (hw >= sizeof(adcChannelIndex)) continue;
+      int8_t idx = adcChannelIndex[hw];
+      if (idx < 0) continue;
+
+      if (idx == ADC_BATTERY_IDX) {
+        battWinSum += p->type2.data;
+        battWinCount++;
+      } else {
+        // each channel keeps its own filter and envelope state
+        float notched = notchFilter[idx].process(fixRaw(p->type2.data));
+
+        float muscle = emgFilter[idx].process(notched);
+        envValue[idx] = envelope[idx].process(abs((int)muscle));
+
+#if BCI_MODE == BCI_MODE_EEGEMG
+        // the same notched sample, low passed and fed to the spectrum
+        if (idx == 0) betaPower.push(eegFilter.process(notched));
+#endif
+      }
+    }
+  }
+
+  if (now >= bciSettleUntil) bciEvaluate(now);
+}
+
+// Averaged battery reading in the same units the LED code expects.
+// Returns 0 when no samples have arrived yet.
+uint16_t bciBatteryMillivolts() {
+  if (battWinCount == 0) return 0;
+  uint16_t avg = (uint16_t)(battWinSum / battWinCount);
+  battWinSum   = 0;
+  battWinCount = 0;
+  return avg;
+}
+#endif  // BCI_ENABLED
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -637,7 +1023,9 @@ void setup() {
   pinMode(USER_BTN_PIN, INPUT_PULLUP);
   irsend.begin();
 
+#if !BCI_ENABLED
   pinMode(BATTERY_VOLTAGE_PIN, INPUT);
+#endif
   pixel.begin();
   pixel.clear();
   pixel.show();
@@ -669,6 +1057,10 @@ void setup() {
   svc->start();
   srv->getAdvertising()->start();
   Serial.println("[BLE] advertising as " BLE_NAME);
+
+#if BCI_ENABLED
+  if (!bciBegin()) Serial.println("[EMG] sampling failed to start");
+#endif
 }
 
 // HELD means the hold threshold was reached while the button is still down,
@@ -681,11 +1073,20 @@ uint32_t lastRelease = 0;
 void loop() {
   uint32_t now = millis();
 
+#if BCI_ENABLED
+  bciService();
+  // the active slot moves on every EMG step, so persist only once it settles
+  if (activeDirtyAt && (now - activeDirtyAt) >= BCI_SAVE_DELAY_MS) {
+    activeDirtyAt = 0;
+    nvsSave();
+  }
+#else
   if (now - lastBatterySample >= BATTERY_SAMPLE_MS) {
     lastBatterySample = now;
     batteryWinSum += analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
     batteryWinCount++;
   }
+#endif
   if (now - lastBatteryCheck >= BATTERY_CHECK_MS) {
     lastBatteryCheck = now;
     batteryColor = batteryPercentToColor(getCurrentBatteryPercentage());
