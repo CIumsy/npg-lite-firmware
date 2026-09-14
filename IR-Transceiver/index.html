@@ -6,6 +6,38 @@
 <meta name="color-scheme" content="light dark">
 <title>NPG IR Controller</title>
 <link rel="stylesheet" href="css/style.css">
+<script>
+/* Keep the desktop workspace intact and fit it inside the available visual
+   viewport.  This runs before the page paints and updates for resize, browser
+   zoom and mobile viewport changes. */
+(() => {
+  const root = document.documentElement;
+  let frame = 0;
+
+  function fitLayout() {
+    frame = 0;
+    const rem = parseFloat(getComputedStyle(root).fontSize) || 16;
+    const minWidth = 60 * rem;
+    const minHeight = 40 * rem;
+    const visual = window.visualViewport;
+    const width = Math.max(1, Math.min(window.innerWidth, visual ? visual.width : window.innerWidth));
+    const height = Math.max(1, Math.min(window.innerHeight, visual ? visual.height : window.innerHeight));
+    const scale = Math.min(1, width / minWidth, height / minHeight);
+
+    root.style.setProperty('--app-scale', scale.toFixed(6));
+    root.style.setProperty('--app-width', Math.max(minWidth, width / scale) + 'px');
+    root.style.setProperty('--app-height', Math.max(minHeight, height / scale) + 'px');
+  }
+
+  function scheduleFit() {
+    if (!frame) frame = requestAnimationFrame(fitLayout);
+  }
+
+  fitLayout();
+  window.addEventListener('resize', scheduleFit, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleFit, { passive: true });
+})();
+</script>
 </head>
 <body>
 

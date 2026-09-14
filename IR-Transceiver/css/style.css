@@ -55,6 +55,12 @@
   --edge: 1px;
   --tap: 200ms cubic-bezier(.4, 0, .2, 1);
 
+  /* Updated before first paint by index.html. The workspace retains its
+     desktop geometry and scales as one unit when the viewport is smaller. */
+  --app-scale: 1;
+  --app-width: 100vw;
+  --app-height: 100dvh;
+
   /* light palette. The greys are spaced far enough apart that a panel, a
      sunken column and a header read as three different surfaces. */
   --bg:           #ffffff;
@@ -148,7 +154,10 @@
    plain display rule would quietly outrank it */
 [hidden] { display: none !important; }
 
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
 
 /* iOS Safari inflates text in landscape without this */
 html {
@@ -222,17 +231,19 @@ svg {
 }
 
 /* app shell -------------------------------------------------
-   The whole window. This is a desktop tool, and the two columns want every
-   pixel of width they can get. */
+   This is a desktop workspace. Rather than changing its composition on a
+   narrow or short viewport, the viewport fitter scales the complete shell so
+   every panel remains visible and in the same relative position. */
 .app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  width: 100%;
-  /* below this the control rows and the two columns stop fitting, so the
-     window scrolls rather than the layout falling apart */
+  width: var(--app-width);
+  height: var(--app-height);
   min-width: 60rem;
+  min-height: 40rem;
   background: var(--bg);
+  transform: scale(var(--app-scale));
+  transform-origin: top left;
 }
 
 /* header ---------------------------------------------------- */
@@ -1232,10 +1243,11 @@ svg {
 
 .select:hover { border-color: var(--text-faint); }
 
-@media (max-width: 30em) {
-  .map-row { flex-wrap: wrap; }
-  .select, .select-wide { width: 100%; }
-}
+/* viewport fitting ------------------------------------------
+   Width and height are calculated from the current visual viewport in the
+   small script in index.html. Keeping that logic outside media queries means
+   a browser resize or zoom never switches the workspace into another layout
+   or leaves any part of it outside the viewport. */
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
