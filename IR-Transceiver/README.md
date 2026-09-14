@@ -1,10 +1,8 @@
 # IR Transceiver
 
-Record and replay infrared remote signals on an NPG Lite (ESP32-C6), managed from a
-browser over Bluetooth.
-
-Hold the user button to record a signal from any IR remote, name it in the web app,
-then replay it with a short press of the button or the Fire button in the app.
+Record and replay infrared remote signals on an NPG Lite (ESP32-C6). Organize them
+into up to 5 remotes of 10 commands each, and control the whole thing from a browser
+over Bluetooth, or hands-free with muscle and brain signals from BioAmp electrodes.
 
 ## Hardware
 
@@ -25,31 +23,21 @@ then replay it with a short press of the button or the Fire button in the app.
 
 SDA and SCL are just the wire names on the STEMMA cable. They carry the transceiver's
 Out and In signals, and the firmware drives them as ordinary GPIO rather than as an
-I2C bus. Both pins are macros at the top of `IR-Transceiver.ino`.
+I2C bus.
 
 ### Status LEDs
 
-The onboard NeoPixel ring reports two things at a glance. Pixel numbering
-matches the rest of the NPG Lite firmware.
+The onboard NeoPixel ring reports two things at a glance.
 
 | Pixel | Reports | Colours |
 | --- | --- | --- |
 | 0 | Bluetooth | red not connected, green connected, blue flash when a command fires |
 | 5 | Battery | red at or below 20%, amber at or below 70%, green above |
 
-Battery is sampled from `A6` in millivolts every 100 ms, averaged and mapped
-through a voltage lookup table every 30 seconds, the same one the other NPG Lite
-sketches use. The percentage only rises after three consecutive higher readings,
-so the colour does not flicker under load.
-
-Nothing is written to the ring while the receiver is armed. Pushing pixel data
-briefly disables interrupts, which can cost the IR receiver an edge mid-capture,
-so the ring is left alone until recording ends.
+Nothing is written to the ring while the receiver is armed, so recording a signal is
+never interrupted by a status update.
 
 ### Checking the transceiver is connected
-
-The firmware cannot tell you this. The module is wired as two plain GPIO lines
-with nothing to interrogate, so read its own indicators instead.
 
 | Indicator | Meaning |
 | --- | --- |
@@ -60,53 +48,11 @@ Fire a saved command with a short press of the user button. Both the OUT and IN
 LEDs should blink once. Green power LED but no blink means the module is powered
 yet its signal pins are not reaching the board, so check pins 22 and 23.
 
-### Muscle and brain control
-
-Electrodes on the bioamp pads can drive the command list without touching the
-board or the app. Everything is configured by macros at the top of the sketch,
-and all signal processing stays on the firmware. The app only receives the
-resulting selection and fire events.
-
-Set `BIOAMP_ENABLED` to false for a plain IR remote. Leave it on only with
-electrodes attached, because a floating input drifts and will trigger by itself.
-
-`BIOAMP_CHANNELS` names the pads to sample, in ascending order. A0 is 0 and A5
-is 5, and the set does not have to be contiguous, so `{ 0, 3 }` is valid. The
-first entry drives the triggers.
-
-One muscle covers both scroll directions.
-
-| Gesture | Action |
-| --- | --- |
-| Short clench | steps up one slot |
-| Clench held past `JAW_HOLD_MS` | scrolls down, repeating every `JAW_REPEAT_MS` |
-| Sustained focus | fires the active command |
-
-A tap can only be distinguished from a hold once the muscle relaxes, so the
-upward step lands on release rather than on contraction.
-
-The signal is notched once and then split. One path is high passed and
-enveloped for the clench. The other is low passed and run through an FFT, and
-focus is the beta share of total power crossing `FOCUS_THRESHOLD`. A clench
-floods the EEG band, so focus is ignored for `JAW_BLOCK_MS` around one.
-
-Thresholds worth calibrating are `JAW_THRESHOLD` with its `JAW_RELEASE`
-hysteresis, and `FOCUS_THRESHOLD`. `NOTCH_HZ` is 50 or 60 and nothing else,
-which the build enforces.
-
-Sampling runs through the ADC in continuous DMA mode, so sample timing never
-jitters regardless of what the rest of the firmware is doing. Battery shares
-the same DMA pattern, because the continuous driver owns ADC1 exclusively.
-Anything that blocks the main loop, such as a flash write or an IR
-transmission, is detected as a gap, and the buffered samples are discarded and
-the filters reset rather than fed a discontinuity.
-
 ### The user button
 
 The sketch reads GPIO 9, which is the boot button on the NPG Lite and on most
-ESP32-C6 boards. On a different dev board this pin will be wrong. Change
+ESP32-C6 boards. On a different dev board this pin will be wrong — change
 `USER_BTN_PIN` at the top of the sketch to whichever button that board exposes.
-Many other ESP32 boards put the boot button on GPIO 0.
 
 ## Flashing
 
@@ -130,9 +76,7 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
    - `Adafruit NeoPixel`
 3. Install **ESP32 (version 3.2.0)** by Espressif Systems from the Boards Manager.
    Go to **Tools -> Board -> Boards Manager**.
-4. Open `IR-Transceiver.ino` from this folder. If you would rather paste the code into
-   a new sketch, save that sketch as `IR-Transceiver` so the folder and the file share
-   a name, which the Arduino IDE requires.
+4. Open `IR-Transceiver.ino` from this folder.
 5. Open the board selector dropdown at the top of the window, the one that reads
    **Select Board**, and pick your board's COM port. It may show as an ESP32 Family
    Device.
@@ -140,9 +84,8 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
 7. Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
 8. Hit the upload button.
 
-Step 7 is not optional. On the default partition scheme the sketch fills 95% of
-program storage and will overflow as soon as anything is added. Huge APP brings it to
-39% and still leaves 1 MB for signal storage.
+Step 7 is not optional. On the default partition scheme the sketch overflows as soon
+as anything is added. Huge APP brings it down to about 40% and leaves room to spare.
 
 ## Using the web app
 
@@ -156,19 +99,56 @@ folder in your browser.
 Either way you need a Chromium based browser like Chrome, Brave or Edge, or any
 browser with Web Bluetooth. Firefox and Safari do not support it.
 
-Press Connect and pick **NPG-IR**. The command list loads automatically.
+1. Press **Connect** and pick **NPG-IR**.
+2. Press the lock icon in the header to unlock. Nothing can be added or changed
+   while locked.
+3. Press **+** on one of the five remote slots on the left and name it. That
+   creates its ten command slots.
+4. Open the remote, press **+** on a command slot, then point a real remote at
+   the board and press a key.
+5. Name the capture and save it.
+6. Lock again when you are done setting up.
 
-To record a signal, hold the user button on the board for 1.5 seconds and let go.
-Recording latches on, so you do not have to keep holding, and the app shows a
-listening overlay with a countdown. Point a remote at the board and press a key.
-The capture dialog opens in the app.
+Once unlocked, every remote and command can also be renamed or deleted from the
+same row. Press the send button on a command to fire it, or use the board's own
+user button to fire whichever command is currently highlighted — a short press
+fires it, and holding it for 1.5 seconds starts recording into the open remote.
 
-Recording ends when a signal arrives, after 15 seconds, or when you cancel it with a
-short press of the button or the Cancel button in the app. A capture lives in RAM only
-until you name it, so it is lost on reboot if you never save it.
+The info button in the header covers the same ground inside the app.
 
-The info button in the header explains the same thing inside the app, along with the
-storage limits and the Erase all action.
+## Hands-free control (BioAmp electrodes)
+
+The four navigation controls — **Forward**, **Backward**, **Select/Shoot IR** and
+**Home** — can each be driven by a muscle or brain gesture instead of a mouse or the
+board's button. Forward and Backward only move the highlight, in whichever list is
+currently active (remotes or commands); Select/Shoot IR is what actually opens a
+remote or fires a command.
+
+Open **Controls** in the app header and set, for each of the four, which channel it
+watches, what that channel is filtered for, and which gesture triggers it. The bar
+next to each one shows its live signal, and the slider under it sets the threshold —
+put it just above your resting level and below a deliberate gesture.
+
+Set `BIOAMP_ENABLED` to `false` at the top of the sketch for a plain IR remote with
+no bio-potential sampling at all. Leave it on only with electrodes attached, since a
+floating input drifts and will trigger on its own.
+
+### Electrode placement
+
+What a channel can trigger depends entirely on what it is filtered for, which in turn
+depends on where the electrodes sit:
+
+| Filter | Placement | Available triggers |
+| --- | --- | --- |
+| EEG | single channel, one pair of electrodes | jaw clench, focus, and blink |
+| EMG | on a muscle | clench (tap or held) only |
+| EOG | around the eye | blink only |
+
+Before placing electrodes, follow Upside Down Labs' guides:
+
+- [Skin preparation](https://docs.upsidedownlabs.tech/guides/usage-guides/skin-preparation/index.html)
+- [Using gel electrodes](https://docs.upsidedownlabs.tech/guides/usage-guides/using-gel-electrodes/index.html)
+  (electrode placement diagrams are on this page too)
 
 ## Layout
 
@@ -183,74 +163,21 @@ assets/              UDL logo, black for light theme and white for dark, and the
 ```
 
 `ble.js` never touches the DOM and `app.js` never touches Bluetooth. To change the
-protocol, only `ble.js` and the firmware need to agree.
+protocol, only `ble.js` and the firmware need to agree — the opcodes and payloads are
+documented as comments next to each `#define` in `IR-Transceiver.ino`.
 
 The icons are [Lucide](https://lucide.dev). Each one is an SVG file in `assets/`, and
 its inner markup is copied into `icons.js` so the icon can inherit colour from the
-theme, which an `<img>` cannot do. Markup writes `<span class="ico" data-icon="name">`
-and `icons.js` fills it in. To add an icon, download it from lucide.dev into `assets/`
-and paste its inner markup into `icons.js` under the same name.
+theme, which an `<img>` cannot do.
 
 ## Storage
 
-Each command is split across two stores on the board.
+Remotes, commands and captured waveforms all live on the board, split across NVS
+(names) and LittleFS (waveforms), and survive a firmware upload. Use **Erase all**
+in the app's info panel to clear everything.
 
-| Store | Holds | Capacity |
-| --- | --- | --- |
-| NVS | command names | 20 KB, roughly 250 names |
-| LittleFS | captured waveforms | 1 MB, roughly 250 signals |
-
-A slot counts as used purely because a name key exists in NVS, so NVS is the index and
-LittleFS is the payload.
-
-The active slot is deliberately not stored. It changes on every scroll, and
-flash is the wrong place for something that moves that often, so it lives in
-RAM and resets to the first saved command on boot. Nothing else in the firmware
-changes frequently: names and waveforms are only written when you save, rename
-or delete, and each of those touches a single key rather than rewriting the set. The build caps this at 50 commands of 16 characters via
-`MAX_COMMANDS` and `MAX_NAME_LEN`. Raising `MAX_COMMANDS` is safe up to 255, which is
-where the single-byte slot id in the protocol runs out.
-
-Names are capped at 16 characters so every notification fits the 20 byte payload that
-the default Bluetooth MTU guarantees, with no dependency on MTU negotiation.
-
-Both stores survive a firmware upload. Use **Erase all** in the app to clear them.
-
-## Protocol
-
-Two characteristics on service `12345678-1234-1234-1234-1234567890ab`, one for
-notifications and one for writes.
-
-| App to board | Payload |
-| --- | --- |
-| `0x01` set active | id |
-| `0x02` delete | id |
-| `0x03` rename | id, name |
-| `0x04` save capture as new | name |
-| `0x05` save capture over slot | id, name |
-| `0x06` request list | |
-| `0x07` fire | id |
-| `0x08` erase everything | |
-| `0x09` cancel recording | |
-| `0x0A` discard pending capture | |
-
-| Board to app | Payload |
-| --- | --- |
-| `0x12` list entry | id, active, nameLen, name |
-| `0x14` end of list | |
-| `0x20` capture ready | isDup, dupId, protocol, bits, value |
-| `0x21` saved | id, nameLen, name |
-| `0x22` deleted | id |
-| `0x23` active changed | id |
-| `0x24` ok | |
-| `0x25` failed | |
-| `0x26` erased | |
-| `0x27` recording started | timeout in seconds |
-| `0x28` recording ended | reason: 0 timeout, 1 button, 2 app |
-
-Firing, listing, erasing and cancelling a recording are handled on the main loop
-rather than inside the Bluetooth callback, because that callback runs on a task with
-a much smaller stack than the IR and filesystem code needs.
+Upgrading to a firmware build with a different storage layout wipes what was saved
+once, automatically, on first boot after the flash — that is expected, not a bug.
 
 ---
 

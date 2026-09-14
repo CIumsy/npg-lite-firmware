@@ -116,8 +116,15 @@ public:
     float value() const { return percent; }
 
     void reset() {
-        fill = 0;
+        resetWindow();
         smoothedBeta = smoothedAll = percent = 0.0f;
+    }
+
+    // Throws away the part-collected window but keeps the last value, for
+    // when the filters restart mid-stream. Reporting zero there would make a
+    // live bar drop to the floor and climb back for no real reason.
+    void resetWindow() {
+        fill = 0;
         for (int i = 0; i < BETA_FFT_SIZE; i++) { re[i] = 0.0f; im[i] = 0.0f; }
     }
 };

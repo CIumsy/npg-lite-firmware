@@ -15,6 +15,13 @@
     <img class="logo light-only" src="assets/udl_logo_black.png" alt="Upside Down Labs">
     <img class="logo dark-only" src="assets/udl_logo_white.png" alt="Upside Down Labs">
     <div class="hdr-actions">
+      <button class="btn btn-sm conn-btn" id="btn-conn" title="Connect">
+        <span class="ico" data-icon="bluetooth"></span>
+        <span id="conn-txt">Connect</span>
+      </button>
+      <button class="icon-btn" id="btn-lock" title="Unlock to configure" aria-label="Unlock to configure" disabled>
+        <span class="ico" data-icon="lock"></span>
+      </button>
       <button class="icon-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">
         <span class="ico light-only" data-icon="sun"></span>
         <span class="ico dark-only" data-icon="moon"></span>
@@ -25,44 +32,46 @@
     </div>
   </header>
 
-  <div class="statusbar">
-    <span class="dot" id="dot" aria-hidden="true"></span>
-    <span class="status-txt" id="status">Not connected</span>
-    <button class="btn btn-sm" id="btn-conn">
-      <span class="ico" data-icon="bluetooth"></span>
-      <span id="conn-txt">Connect</span>
-    </button>
+  <!-- Settings only: what each channel measures, and what its gestures do. -->
+  <div class="section-hdr">
+    <span class="bar-ttl">Controls</span>
+    <div class="bar-tools">
+      <span class="notch-lbl">Mains notch</span>
+      <div class="switch" id="notch" role="group" aria-label="Mains notch">
+        <button type="button" data-hz="50">50 Hz</button>
+        <button type="button" data-hz="60">60 Hz</button>
+      </div>
+    </div>
   </div>
 
-  <main class="main">
+  <!-- One row per control: what it is, which channel and filter feed it,
+       which gesture drives it, and the level that gesture is measured on. -->
+  <div class="controls" id="controls"></div>
 
-    <div class="section-hdr">
-      <span class="section-ttl">Commands</span>
-      <span class="badge" id="count">0</span>
-      <button class="icon-btn icon-btn-sm" id="btn-refresh" title="Refresh list" aria-label="Refresh list" disabled>
-        <span class="ico" data-icon="refresh-cw"></span>
-      </button>
+  <main class="cols">
+    <div class="col col-profiles">
+      <div class="col-ttl">
+        <span>Remotes</span>
+      </div>
+      <div class="col-body">
+        <ul class="list" id="profiles"></ul>
+      </div>
     </div>
 
-    <ul class="list" id="list"></ul>
-
-    <div class="empty" id="empty">
-      <span class="ico" data-icon="radio-tower"></span>
-      <p id="empty-txt">Connect to your NPG board to load commands.</p>
+    <div class="col col-commands">
+      <div class="col-ttl">
+        <span id="cmd-ttl">Commands</span>
+      </div>
+      <div class="col-body">
+        <ul class="grid" id="list"></ul>
+        <p class="col-empty" id="cmd-empty"></p>
+      </div>
     </div>
-
   </main>
 
-  <footer class="ftr">
-    <div class="active-row">
-      <span class="active-lbl">Active</span>
-      <span class="active-nm none" id="active-nm">None</span>
-    </div>
-    <button class="btn btn-primary btn-fire" id="btn-fire" disabled>
-      <span class="ico" data-icon="power"></span>
-      Fire
-    </button>
-  </footer>
+
+  <!-- Phones only. Every command row has its own fire button, but they are
+       a small target, so the selected one gets a full width button too. -->
 
 </div>
 
@@ -114,7 +123,7 @@
 <div class="overlay" id="ov-rename">
   <div class="modal">
     <div class="modal-hdr">
-      <h2 class="modal-ttl">Rename command</h2>
+      <h2 class="modal-ttl" id="ren-ttl">Rename command</h2>
       <button class="icon-btn icon-btn-sm" data-close="ov-rename" aria-label="Close">
         <span class="ico" data-icon="x"></span>
       </button>
@@ -146,7 +155,7 @@
       <p class="prose" id="cfm-body"></p>
     </div>
     <div class="modal-ftr">
-      <button class="btn" data-close="ov-confirm">Cancel</button>
+      <button class="btn" id="cfm-no">Cancel</button>
       <button class="btn btn-danger" id="cfm-ok">Delete</button>
     </div>
   </div>
@@ -166,32 +175,17 @@
       <section class="info-sec">
         <h3 class="info-ttl">Getting started</h3>
         <ol class="steps">
-          <li>Power the NPG board and press <b>Connect</b>. Pick <b>NPG-IR</b> from the browser dialog.</li>
-          <li><b>Hold</b> the user button for 1.5 seconds and let go. The app shows a listening overlay.</li>
-          <li>Point a remote at the board and press a key. The capture dialog opens here. Type a name and save it.</li>
-          <li><b>Short press</b> the user button to fire the active command, or use the Fire button.</li>
+          <li>Power the board and press <b>Connect</b>. Pick <b>NPG-IR</b> from the browser dialog.</li>
+          <li>Press the lock icon to unlock, then press <b>+</b> on a remote and name it.</li>
+          <li>Open the remote, press <b>+</b> on a command, then point a real remote at the board and press a key.</li>
+          <li>Name the capture and save it. Lock again when you're done setting up.</li>
+          <li>Press a command's send button to fire it.</li>
         </ol>
       </section>
 
       <section class="info-sec">
-        <h3 class="info-ttl">The user button</h3>
-        <dl class="meta">
-          <dt>Short press</dt><dd>Fires the active command</dd>
-          <dt>Hold 1.5s</dt><dd>Starts recording, then you can let go</dd>
-          <dt>While recording</dt><dd>A short press cancels it</dd>
-        </dl>
-        <p class="prose">Recording stays on after you release the button. It ends when a signal arrives, after 15 seconds, or when you cancel. If a capture is still waiting to be named, starting a new recording replaces it.</p>
-      </section>
-
-      <section class="info-sec">
-        <h3 class="info-ttl">How it is stored</h3>
-        <p class="prose">Each command is split across two places on the board. Names and the active slot live in <b>NVS</b>. The captured waveform lives in <b>LittleFS</b>. A capture stays in RAM only until you name it, so a reboot before naming loses it.</p>
-        <dl class="meta">
-          <dt>NVS</dt><dd>20 KB, about 250 names</dd>
-          <dt>LittleFS</dt><dd>1 MB, about 250 signals</dd>
-          <dt>This build</dt><dd>50 commands, 16 characters each</dd>
-        </dl>
-        <p class="prose">Both survive a firmware upload. Use Erase all below to clear them, or run a full chip erase from the command line. Flash the board with the <b>Huge APP (3MB No OTA/1MB SPIFFS)</b> partition scheme, otherwise the sketch barely fits.</p>
+        <h3 class="info-ttl">Muscle and brain control</h3>
+        <p class="prose">Open <b>Controls</b> in the header to pick a channel, a filter and a gesture for each of the four actions. The bar beside each one shows its live level, and the slider sets the threshold that counts as a gesture: put it just above your resting level and below a deliberate one.</p>
       </section>
 
       <section class="info-sec">
@@ -201,8 +195,8 @@
 
       <section class="info-sec danger-zone">
         <h3 class="info-ttl">Erase all</h3>
-        <p class="prose">Removes every saved name and waveform from the board. This cannot be undone.</p>
-        <button class="btn btn-danger" id="btn-wipe" disabled>Erase all commands</button>
+        <p class="prose">Removes every remote, command and waveform from the board. This cannot be undone.</p>
+        <button class="btn btn-danger" id="btn-wipe" disabled>Erase everything</button>
       </section>
 
     </div>
