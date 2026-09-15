@@ -58,18 +58,19 @@ ESP32-C6 boards. On a different dev board this pin will be wrong, change
 
 ## Flashing
 
-Two ways. The web flasher is quicker if you only want to run the firmware. Use the
+First, Flip the power switch on the NPG Lite and make sure its battery cable is connected.
+Then, Connect it to your computer with a USB to Type-C cable.
+
+Two ways to flash: The web flasher is quicker if you only want to run the firmware. Use the
 Arduino IDE if you plan to change it.
 
 ### Web flasher
 
 Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher-Web/).
 
-1. Flip the power switch on the NPG Lite and make sure its battery cable is connected.
-2. Connect it to your computer with a USB to Type-C cable.
-3. Press **Connect** and pick the **USB JTAG** serial device.
-4. Press **Get from GitHub** and choose the **BCI-IR-Remote** firmware.
-5. Flash it. You can unplug the cable once it finishes.
+1. Press **Connect** and pick the **USB JTAG** serial device.
+2. Press **Get from GitHub** and choose the **BCI-IR-Remote** firmware.
+3. Flash it. You can unplug the cable once it finishes.
 
 ### Arduino IDE
 
@@ -79,15 +80,17 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
    - `Adafruit NeoPixel`
 3. Install **ESP32 (version 3.2.0)** by Espressif Systems from the Boards Manager.
    Go to **Tools -> Board -> Boards Manager**.
-4. Open `IR-Transceiver.ino` from this folder.
-5. Open the board selector dropdown at the top of the window, the one that reads
+4. Download the [NPG-Lite-Arduino-Firmware](https://github.com/upsidedownlabs/NPG-Lite-Arduino-Firmware)
+   repository.
+5. Open `BCI-IR-Remote.ino` from its `BCI-IR-Remote` folder.
+6. Open the board selector dropdown at the top of the window, the one that reads
    **Select Board**, and pick your board's COM port. It may show as an ESP32 Family
    Device.
-6. Go to **Tools -> Board -> ESP32 -> ESP32C6 Dev Module**.
-7. (Optional) Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
-8. Hit the upload button.
+7. Go to **Tools -> Board -> ESP32 -> ESP32C6 Dev Module**.
+8. (Optional) Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
+9. Hit the upload button.
 
-The sketch fits on the default partition scheme too, but only barely, so step 7 is
+The sketch fits on the default partition scheme too, but only barely, so step 8 is
 optional. It brings the sketch down to about 40% and leaves room to spare if you
 plan to add more to it.
 
@@ -99,7 +102,7 @@ of gesturing.
 
 Open
 [NPG-Lite-Arduino-Firmware in BioAmp Arduino Firmware Explorer](https://upsidedownlabs.github.io/BioAmp-Arduino-Firmware-Explorer/?owner=upsidedownlabs&repo=npg-lite-firmware)
-and go to **web app** under **IR-Transceiver**.
+and go to **web app** under **BCI-IR-Remote**.
 
 Alternatively, download this repo and open `index.html` in your browser.
 
