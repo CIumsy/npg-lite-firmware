@@ -592,7 +592,7 @@ svg {
 /* A button's own hover has to read as its own, even sitting inside a row
    that turns the same shade of surface-hi on hover, so it goes one step
    further to var(--border). */
-.icon-btn:hover:not(:disabled) {
+.icon-btn:hover:not(:disabled):not(.locked-out) {
   background: var(--border);
   border-color: var(--border-hi);
   color: var(--text);
@@ -601,6 +601,23 @@ svg {
 .icon-btn:disabled {
   opacity: .35;
   cursor: not-allowed;
+}
+
+/* Looks disabled while locked, but stays clickable so it can say why. */
+.icon-btn.locked-out {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* A couple of quick blinks on the lock icon when a locked edit is attempted,
+   pointing at the way to actually unlock. */
+@keyframes lock-hint {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .25; }
+}
+
+#btn-lock.hint {
+  animation: lock-hint 200ms ease-in-out 2;
 }
 
 .icon-btn svg { width: 1rem; height: 1rem; }

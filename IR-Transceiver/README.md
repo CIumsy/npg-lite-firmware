@@ -1,13 +1,11 @@
 # BCI IR Remote
 
-A brain-computer interface (BCI) remote control. BioAmp electrodes on an NPG Lite
-(ESP32-C6) turn jaw clenches, blinks, and focus into IR remote commands, so you can
+A brain-computer interface (BCI) remote control. Using Neuro PlayGround Lite, turn your brain, eye and muscle signals into IR remote commands, so you can
 record any remote's signals and fire them hands-free, with no mouse or physical
 button. Organize commands into up to 5 remotes of 10 each.
 
-A browser app over Bluetooth handles setup, and doubles as a manual alternative
-when you would rather click than gesture.
-
+A browser app over Bluetooth handles setup, can be used as a manual alternative when you would rather click than gesture.
+ 
 ## Hardware
 
 | Part | Link |
@@ -41,9 +39,6 @@ The onboard NeoPixel ring reports two things at a glance.
 | 0 | Bluetooth | red not connected, green connected |
 | 5 | Battery | red at or below 20%, amber at or below 70%, green above |
 
-Nothing is written to the ring while the receiver is armed, so recording a signal is
-never interrupted by a status update.
-
 ### Checking the transceiver is connected
 
 | Indicator | Meaning |
@@ -73,7 +68,7 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
 1. Flip the power switch on the NPG Lite and make sure its battery cable is connected.
 2. Connect it to your computer with a USB to Type-C cable.
 3. Press **Connect** and pick the **USB JTAG** serial device.
-4. Press **Get from GitHub** and choose the **BCI-IR-Controller** firmware.
+4. Press **Get from GitHub** and choose the **BCI-IR-Remote** firmware.
 5. Flash it. You can unplug the cable once it finishes.
 
 ### Arduino IDE
@@ -106,8 +101,7 @@ Open
 [NPG-Lite-Arduino-Firmware in BioAmp Arduino Firmware Explorer](https://upsidedownlabs.github.io/BioAmp-Arduino-Firmware-Explorer/?owner=upsidedownlabs&repo=npg-lite-firmware)
 and go to **web app** under **IR-Transceiver**.
 
-Alternatively, download this repo and open `index.html` from the `IR-Transceiver`
-folder in your browser.
+Alternatively, download this repo and open `index.html` in your browser.
 
 Either way you need a Chromium based browser like Chrome, Brave or Edge, or any
 browser with Web Bluetooth. Firefox and Safari do not support it.
@@ -175,26 +169,6 @@ For placement diagrams and more detail, see Upside Down Labs' guides:
 
 - [Skin preparation](https://docs.upsidedownlabs.tech/guides/usage-guides/skin-preparation/index.html)
 - [Using gel electrodes](https://docs.upsidedownlabs.tech/guides/usage-guides/using-gel-electrodes/index.html)
-
-## Layout
-
-```
-IR-Transceiver.ino   firmware
-index.html           markup
-css/style.css        design tokens and all styling
-js/ble.js            Bluetooth transport and wire protocol
-js/app.js            UI and state
-js/icons.js          the icon set
-assets/              UDL logo, black for light theme and white for dark, and the icon originals
-```
-
-`ble.js` never touches the DOM and `app.js` never touches Bluetooth. To change the
-protocol, only `ble.js` and the firmware need to agree. The opcodes and payloads are
-documented as comments next to each `#define` in `IR-Transceiver.ino`.
-
-The icons are [Lucide](https://lucide.dev). Each one is an SVG file in `assets/`, and
-its inner markup is copied into `icons.js` so the icon can inherit colour from the
-theme, which an `<img>` cannot do.
 
 ## Storage
 

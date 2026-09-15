@@ -189,9 +189,19 @@
   function explainLock() {
     document.querySelectorAll('.ctl-row select, .switch button, .add-btn, .row-actions button')
       .forEach(node => {
-        if (locked && node.disabled) node.title = LOCK_HINT;
+        if (locked && (node.disabled || node.classList.contains('locked-out'))) node.title = LOCK_HINT;
         else if (node.title === LOCK_HINT) node.title = '';
       });
+  }
+
+  // A click on an edit, delete or add button while locked says why nothing
+  // happened and points at the way out, rather than just sitting there dim.
+  function lockedToast() {
+    toast('Unlock edits by clicking on the unlock button at the top', true);
+    el.lock.classList.remove('hint');
+    void el.lock.offsetWidth;
+    el.lock.classList.add('hint');
+    setTimeout(() => el.lock.classList.remove('hint'), 600);
   }
 
   /* controls --------------------------------------------------
@@ -466,11 +476,16 @@
 
       const add = document.createElement('button');
       add.className = 'icon-btn icon-btn-sm add-btn';
-      add.disabled = locked || named;
+      add.disabled = named;
+      add.classList.toggle('locked-out', locked && !named);
       add.title = 'Set up this remote';
       add.setAttribute('aria-label', 'Set up ' + displayName);
       add.appendChild(Icons.svg('plus'));
-      add.addEventListener('click', e => { e.stopPropagation(); openRename('profile', id); });
+      add.addEventListener('click', e => {
+        e.stopPropagation();
+        if (locked) { lockedToast(); return; }
+        openRename('profile', id);
+      });
       if (named) add.hidden = true;
       li.appendChild(add);
 
@@ -572,11 +587,15 @@
       } else {
         const add = document.createElement('button');
         add.className = 'icon-btn icon-btn-sm add-btn';
-        add.disabled = locked;
+        add.classList.toggle('locked-out', locked);
         add.title = 'Record into ' + cmd.name;
         add.setAttribute('aria-label', 'Record into ' + cmd.name);
         add.appendChild(Icons.svg('plus'));
-        add.addEventListener('click', e => { e.stopPropagation(); recordInto(id); });
+        add.addEventListener('click', e => {
+          e.stopPropagation();
+          if (locked) { lockedToast(); return; }
+          recordInto(id);
+        });
         li.appendChild(add);
       }
 
@@ -608,21 +627,34 @@
     const actions = document.createElement('span');
     actions.className = 'row-actions';
 
+    // noRename/noDelete are structural (nothing there to act on) and stay a
+    // real disabled button. Locked is temporary, so it stays clickable and
+    // says why, rather than going silent.
     const edit = document.createElement('button');
     edit.className = 'icon-btn icon-btn-sm';
     edit.title = 'Rename';
     edit.setAttribute('aria-label', 'Rename ' + name);
     edit.appendChild(Icons.svg('pencil'));
-    edit.addEventListener('click', e => { e.stopPropagation(); onRename(); });
-    edit.disabled = noRename || locked;
+    edit.disabled = noRename;
+    edit.classList.toggle('locked-out', locked && !noRename);
+    edit.addEventListener('click', e => {
+      e.stopPropagation();
+      if (locked) { lockedToast(); return; }
+      onRename();
+    });
 
     const del = document.createElement('button');
     del.className = 'icon-btn icon-btn-sm danger';
     del.title = 'Delete';
     del.setAttribute('aria-label', 'Delete ' + name);
     del.appendChild(Icons.svg('trash'));
-    del.addEventListener('click', e => { e.stopPropagation(); onDelete(); });
-    del.disabled = noDelete || locked;
+    del.disabled = noDelete;
+    del.classList.toggle('locked-out', locked && !noDelete);
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      if (locked) { lockedToast(); return; }
+      onDelete();
+    });
 
     actions.append(edit, del);
     return actions;
