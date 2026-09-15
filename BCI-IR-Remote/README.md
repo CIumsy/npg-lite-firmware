@@ -84,12 +84,12 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
    **Select Board**, and pick your board's COM port. It may show as an ESP32 Family
    Device.
 6. Go to **Tools -> Board -> ESP32 -> ESP32C6 Dev Module**.
-7. Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
+7. (Optional) Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
 8. Hit the upload button.
 
-The sketch fits on the default partition scheme too, but only barely, so it can
-overflow if you add anything to it. Step 7 brings it down to about 40% and leaves
-room to spare.
+The sketch fits on the default partition scheme too, but only barely, so step 7 is
+optional. It brings the sketch down to about 40% and leaves room to spare if you
+plan to add more to it.
 
 ## Setup and manual control (browser app)
 
