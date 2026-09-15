@@ -1,8 +1,12 @@
-# IR Transceiver
+# BCI IR Remote
 
-Record and replay infrared remote signals on an NPG Lite (ESP32-C6). Organize them
-into up to 5 remotes of 10 commands each, and control the whole thing from a browser
-over Bluetooth, or hands-free with muscle and brain signals from BioAmp electrodes.
+A brain-computer interface (BCI) remote control. BioAmp electrodes on an NPG Lite
+(ESP32-C6) turn jaw clenches, blinks, and focus into IR remote commands, so you can
+record any remote's signals and fire them hands-free, with no mouse or physical
+button. Organize commands into up to 5 remotes of 10 each.
+
+A browser app over Bluetooth handles setup, and doubles as a manual alternative
+when you would rather click than gesture.
 
 ## Hardware
 
@@ -11,6 +15,9 @@ over Bluetooth, or hands-free with muscle and brain signals from BioAmp electrod
 | Adafruit IR Transceiver | [adafruit.com/product/5990](https://www.adafruit.com/product/5990) |
 | 4-pin JST PH to JST SH cable, STEMMA to QT / Qwiic, 200mm | [adafruit.com/product/4424](https://www.adafruit.com/product/4424) |
 | NPG Lite kit | [upsidedownlabs.in](https://www.upsidedownlabs.in/shop?search=neuro+playground) |
+| 3 x BioAmp Snap Cables | |
+| 3 x Gel electrodes | |
+| 1 x Alcohol swab | |
 
 ### Wiring
 
@@ -31,7 +38,7 @@ The onboard NeoPixel ring reports two things at a glance.
 
 | Pixel | Reports | Colours |
 | --- | --- | --- |
-| 0 | Bluetooth | red not connected, green connected, blue flash when a command fires |
+| 0 | Bluetooth | red not connected, green connected |
 | 5 | Battery | red at or below 20%, amber at or below 70%, green above |
 
 Nothing is written to the ring while the receiver is armed, so recording a signal is
@@ -51,7 +58,7 @@ yet its signal pins are not reaching the board, so check pins 22 and 23.
 ### The user button
 
 The sketch reads GPIO 9, which is the boot button on the NPG Lite and on most
-ESP32-C6 boards. On a different dev board this pin will be wrong — change
+ESP32-C6 boards. On a different dev board this pin will be wrong, change
 `USER_BTN_PIN` at the top of the sketch to whichever button that board exposes.
 
 ## Flashing
@@ -63,10 +70,11 @@ Arduino IDE if you plan to change it.
 
 Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher-Web/).
 
-1. Connect the NPG Lite, or another ESP32-C6 board, over USB.
-2. Press **Connect** and pick the **USB JTAG** serial device.
-3. Press **Get from GitHub** and choose the **IR-Transceiver** firmware.
-4. Flash it.
+1. Flip the power switch on the NPG Lite and make sure its battery cable is connected.
+2. Connect it to your computer with a USB to Type-C cable.
+3. Press **Connect** and pick the **USB JTAG** serial device.
+4. Press **Get from GitHub** and choose the **BCI-IR-Controller** firmware.
+5. Flash it. You can unplug the cable once it finishes.
 
 ### Arduino IDE
 
@@ -84,10 +92,15 @@ Use the [NPG Lite Flasher Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher
 7. Go to **Tools -> Partition Scheme -> Huge APP (3MB No OTA/1MB SPIFFS)**.
 8. Hit the upload button.
 
-Step 7 is not optional. On the default partition scheme the sketch overflows as soon
-as anything is added. Huge APP brings it down to about 40% and leaves room to spare.
+The sketch fits on the default partition scheme too, but only barely, so it can
+overflow if you add anything to it. Step 7 brings it down to about 40% and leaves
+room to spare.
 
-## Using the web app
+## Setup and manual control (browser app)
+
+Recording remotes and commands always happens here, and it also works as a
+manual alternative to BCI control: point, click, and fire from the app instead
+of gesturing.
 
 Open
 [NPG-Lite-Arduino-Firmware in BioAmp Arduino Firmware Explorer](https://upsidedownlabs.github.io/BioAmp-Arduino-Firmware-Explorer/?owner=upsidedownlabs&repo=npg-lite-firmware)
@@ -111,32 +124,46 @@ browser with Web Bluetooth. Firefox and Safari do not support it.
 
 Once unlocked, every remote and command can also be renamed or deleted from the
 same row. Press the send button on a command to fire it, or use the board's own
-user button to fire whichever command is currently highlighted — a short press
+user button to fire whichever command is currently highlighted. A short press
 fires it, and holding it for 1.5 seconds starts recording into the open remote.
 
 The info button in the header covers the same ground inside the app.
 
-## Hands-free control (BioAmp electrodes)
+## Brain-computer interface (BCI) control
 
-The four navigation controls — **Forward**, **Backward**, **Select/Shoot IR** and
-**Home** — can each be driven by a muscle or brain gesture instead of a mouse or the
-board's button. Forward and Backward only move the highlight, in whichever list is
-currently active (remotes or commands); Select/Shoot IR is what actually opens a
-remote or fires a command.
+This is the point of the project: controlling the remote hands-free, with
+muscle and brain signals read by BioAmp electrodes, instead of the browser app.
+
+The four navigation controls, **Forward**, **Backward**, **Shoot IR** and
+**Switch Remote**, can each be driven by a muscle or brain gesture instead of a
+mouse or the board's button. Forward and Backward move the highlight through the
+open remote's commands. Switch Remote steps to the next remote and selects its
+first command. Shoot IR fires whichever command is currently selected.
 
 Open **Controls** in the app header and set, for each of the four, which channel it
 watches, what that channel is filtered for, and which gesture triggers it. The bar
-next to each one shows its live signal, and the slider under it sets the threshold —
-put it just above your resting level and below a deliberate gesture.
+next to each one shows its live signal, and the slider under it sets the threshold,
+just above your resting level and below a deliberate gesture.
 
 Set `BIOAMP_ENABLED` to `false` at the top of the sketch for a plain IR remote with
 no bio-potential sampling at all. Leave it on only with electrodes attached, since a
 floating input drifts and will trigger on its own.
 
-### Electrode placement
+### Skin preparation and electrode placement
 
-What a channel can trigger depends entirely on what it is filtered for, which in turn
-depends on where the electrodes sit:
+1. Clean your skin with an alcohol swab, on your forehead and behind both ears.
+2. Snap the BioAmp Snap cables onto the gel electrodes, then peel off the plastic
+   backing and place them: one on your forehead, which is positive, and one behind
+   each ear on the bony part, which are negative and reference.
+3. Connect the other end of each wire to the NPG Lite:
+   - Positive to **A0P**
+   - Negative to **A0N**
+   - Reference to **REF**
+
+![EEG electrode placement](assets/eeg_placement.png)
+
+What a channel can trigger depends entirely on what it is filtered for, which in
+turn depends on where the electrodes sit:
 
 | Filter | Placement | Available triggers |
 | --- | --- | --- |
@@ -144,11 +171,10 @@ depends on where the electrodes sit:
 | EMG | on a muscle | clench (tap or held) only |
 | EOG | around the eye | blink only |
 
-Before placing electrodes, follow Upside Down Labs' guides:
+For placement diagrams and more detail, see Upside Down Labs' guides:
 
 - [Skin preparation](https://docs.upsidedownlabs.tech/guides/usage-guides/skin-preparation/index.html)
 - [Using gel electrodes](https://docs.upsidedownlabs.tech/guides/usage-guides/using-gel-electrodes/index.html)
-  (electrode placement diagrams are on this page too)
 
 ## Layout
 
@@ -163,7 +189,7 @@ assets/              UDL logo, black for light theme and white for dark, and the
 ```
 
 `ble.js` never touches the DOM and `app.js` never touches Bluetooth. To change the
-protocol, only `ble.js` and the firmware need to agree — the opcodes and payloads are
+protocol, only `ble.js` and the firmware need to agree. The opcodes and payloads are
 documented as comments next to each `#define` in `IR-Transceiver.ino`.
 
 The icons are [Lucide](https://lucide.dev). Each one is an SVG file in `assets/`, and
@@ -177,7 +203,7 @@ Remotes, commands and captured waveforms all live on the board, split across NVS
 in the app's info panel to clear everything.
 
 Upgrading to a firmware build with a different storage layout wipes what was saved
-once, automatically, on first boot after the flash — that is expected, not a bug.
+once, automatically, on first boot after the flash. That is expected, not a bug.
 
 ---
 

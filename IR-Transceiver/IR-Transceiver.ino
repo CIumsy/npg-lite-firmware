@@ -100,12 +100,6 @@
 #define GEST_TRIPLE_BLINK  5
 #define GESTURE_COUNT      6
 
-// The levels a channel measures, and what its thresholds apply to.
-#define SIG_MUSCLE   0
-#define SIG_FOCUS    1
-#define SIG_BLINK    2
-#define SIGNAL_COUNT 3
-
 // Playmate variants, detected on boot. Only the channel count matters here.
 #define PLAYMATE_PROTO      0   // 3 BioAmp channels, no buzzer or motor
 #define PLAYMATE_VIBZ       1   // 3 BioAmp channels, buzzer and motor
@@ -139,7 +133,6 @@
 #define PIXEL_COUNT         6
 #define BLE_LED             0
 #define BATTERY_LED         5
-#define BLUE_LED_DURATION   100
 #define BATTERY_VOLTAGE_PIN A6
 
 // Timing
@@ -216,8 +209,8 @@
 #define CMD_START_REC      0x15
 #define CMD_SET_CHANNELS   0x16   // [notchHz, filter x6], re-inits sampling
 
-// What the board can be asked to do. Index into triggerFor[].
-#define ACT_NONE         0
+// What the board can be asked to do. Index into triggerFor[]. Index 0 is
+// unused, actions start at 1.
 #define ACT_SCROLL_DOWN  1
 #define ACT_SCROLL_UP    2
 #define ACT_FIRE         3
@@ -308,7 +301,7 @@ struct Bind {
 };
 
 Bind triggerFor[ACTION_COUNT] = {
-  { 0xFF, GEST_NONE },          // ACT_NONE
+  { 0xFF, GEST_NONE },          // index 0, unused
   { 0, GEST_CLENCH_HOLD },      // ACT_SCROLL_DOWN
   { 0, GEST_CLENCH },           // ACT_SCROLL_UP
   { 0, GEST_FOCUS },            // ACT_FIRE
@@ -890,9 +883,8 @@ void serviceList(uint32_t now) {
 
 // ---- Navigation ---------------------------------------------------------
 
-// Home always lands the cursor on the first remote, so it behaves like a
-// home key rather than a "back" that returns wherever you left off. It only
-// moves the cursor, not what is open - opening is the select button's job.
+// Moves the cursor to the first remote. Does not change what is open,
+// opening is the select button's job.
 void goHome() {
   screen     = SCREEN_HOME;
   homeCursor = nextProfile(-1, 1);
@@ -980,16 +972,9 @@ uint32_t batteryPercentToColor(int percent) {
 }
 
 // Writes both leds and shows them, but only when a color changed.
-void updateStatusLeds(bool connected, unsigned long nowMs) {
-  // Bluetooth led: red until connected, blue while a command is firing,
-  // green when connected but idle.
-  if (nowMs - lastCmdSentMs < BLUE_LED_DURATION) {
-    bleColor = pixel.Color(0, 0, 30);
-  } else if (!connected) {
-    bleColor = pixel.Color(20, 0, 0);
-  } else {
-    bleColor = pixel.Color(0, 20, 0);
-  }
+void updateStatusLeds(bool connected) {
+  // Bluetooth led: red until connected, green once connected.
+  bleColor = connected ? pixel.Color(0, 20, 0) : pixel.Color(20, 0, 0);
 
   if (bleColor == shownBleColor && batteryColor == shownBatteryColor) {
     return;
@@ -1314,14 +1299,8 @@ struct ChannelState {
 
   uint32_t lastFocusMs = 0;
 
-  // Restart the recursive filters, whose state is meaningless across a gap.
-  //
-  // The envelopes and the last reported levels are deliberately kept. They
-  // are moving averages, so they carry no ringing to clear, and zeroing them
-  // makes every live bar collapse and crawl back each time an IR send blocks
-  // the loop. Triggers are held off for TRIGGER_SETTLE anyway, which is
-  // longer than the envelope window, so nothing can fire on the transient.
-  // A genuine fresh start, for when sampling begins.
+  // Resets the IIR filters. Their state is meaningless across a gap, so
+  // this is for a genuine fresh start, when sampling begins.
   void resetFilters() {
     notch.reset();
     emg.reset();
@@ -1331,11 +1310,9 @@ struct ChannelState {
     clearGestures();
   }
 
-  // Half-finished gestures are meaningless after a break in the samples, but
-  // the filters are not: their state describes a DC level that has not moved,
-  // so it is carried across the gap. Zeroing it instead would make every
-  // band pass ring as it charged back up, which is what a spike on the bars
-  // after each IR send really was.
+  // Resets gesture state after a gap in the samples. Filter and envelope
+  // state is kept, since it describes a signal level that has not moved.
+  // Zeroing it would cause a ringing transient instead.
   void clearGestures() {
     beta.resetWindow();
     held = repeating = false;
@@ -1470,20 +1447,15 @@ bool bioampBegin() {
 }
 
 // Called when the app applies a new channel selection. channelFilter[] is
-// already updated by the time this runs, so rebuilding from scratch picks up
-// the new pattern - stopping without this left the ADC deinitialized for
-// good, which is why the live bars used to go dead after any channel change.
+// already updated, so rebuilding from scratch picks up the new pattern.
 void bioampRestart() {
   bioampStop();
   if (!bioampBegin()) Serial.println("[BIO] restart failed");
 }
 
-// Throw away buffered samples and restart the filters. Called whenever
-// something blocked us, because a gap mid-stream makes the IIR state
-// meaningless and the ringing on resume looks exactly like a contraction.
-// Something blocked us, so the samples DMA collected while we were away are
-// thrown out. The filters keep their state, which is what stops the levels
-// lurching every time an IR frame goes out.
+// Called after a gap in sampling. Drops the buffered samples and resets
+// gesture state. Filter state is kept, since a gap does not change the
+// signal level, and zeroing it would cause ringing on resume.
 static void bioampReset() {
   if (adcHandle) {
     uint8_t scratch[ADC_FRAME_BYTES];
@@ -1807,7 +1779,7 @@ void setup() {
   batteryColor = batteryPercentToColor(currentBattery);
   if (!LittleFS.begin(true)) Serial.println("[FS] mount failed");
 
-  updateStatusLeds(false, millis());   // battery on, bluetooth red
+  updateStatusLeds(false);   // battery on, bluetooth red
   lastBatteryCheck = millis();         // the battery was just read above
 
   checkStoreVersion();
@@ -1858,7 +1830,7 @@ void loop() {
   }
   // show() briefly disables interrupts, which can cost the receiver an edge,
   // so the ring is left alone while it is armed
-  if (!recording) updateStatusLeds(bleConnected, now);
+  if (!recording) updateStatusLeds(bleConnected);
 
   // Deferred work from the BLE callback and from the triggers
   if (reqFire >= 0) {

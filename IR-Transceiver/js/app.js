@@ -1055,8 +1055,9 @@
   BLE.on('listEnd', () => { clearTimeout(listTimer); finishList(); });
 
   BLE.on('saved', cmd => {
-    const was = commands.get(cmd.id);
-    commands.set(cmd.id, { name: cmd.name, recorded: was ? was.recorded : true });
+    // The board only sends this for a command that now has a recording,
+    // whether this is a fresh save or a rename of one that already did.
+    commands.set(cmd.id, { name: cmd.name, recorded: true });
     if (activeId < 0) activeId = cmd.id;
     bumpCount();
     loading = false;
