@@ -1245,6 +1245,10 @@
   /* wiring --------------------------------------------------- */
 
   el.conn.addEventListener('click', async () => {
+    if (el.conn.classList.contains('unsupported')) {
+      toast("This browser can't connect over Bluetooth. Open the page in Chrome, Brave or Edge.", true);
+      return;
+    }
     if (BLE.isConnected()) { BLE.disconnect(); return; }
     setStatus('Scanning');
     try { await BLE.connect(); }
@@ -1338,15 +1342,9 @@
   });
 
   if (!BLE.isSupported()) {
-    el.conn.disabled = true;
+    el.conn.classList.add('unsupported');
     setStatus('Web Bluetooth not supported');
-    const notice = document.createElement('div');
-    notice.className = 'notice';
-    notice.appendChild(Icons.svg('triangle-alert'));
-    const text = document.createElement('span');
-    text.textContent = 'This browser cannot talk to Bluetooth devices. Open this page in Chrome or Edge.';
-    notice.appendChild(text);
-    document.querySelector('.cols').prepend(notice);
+    openModal('ov-browser-warning');
   }
 
   render();

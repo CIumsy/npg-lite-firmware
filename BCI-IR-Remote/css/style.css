@@ -297,6 +297,13 @@ svg {
   background: var(--danger);
 }
 
+/* Web Bluetooth is missing entirely. Looks disabled, same as :disabled, but
+   stays clickable so a click can explain why nothing will happen. */
+.conn-btn.unsupported {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 /* status bar ------------------------------------------------ */
 
 .dot.live { background: var(--ok); }
